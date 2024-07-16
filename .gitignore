@@ -2,3 +2,5 @@ output
 src/refactor.txt
 CMakeLists.txt
 .vscode
+.idea
+cmake-buildd-debug
