@@ -1,3 +1,9 @@
-build
-cmake-build-debug
-output
+build/
+cmake-build-debug/
+output/
+
+
+.idea/
+
+
+
