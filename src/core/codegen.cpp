@@ -23,21 +23,23 @@ void gen_code_for_ast(const std::vector<ast_node_t>& ast, std::ofstream &asm_fil
     for (const auto& node : ast) {
         gen_node_code(node, asm_file);
     }
+    asm_file << "    syscall" << std::endl;
 }
 
 void gen_node_code(const ast_node_t &node, std::ofstream &asm_file)
 {
-    switch (node.value)
+    switch (node.type)
     {
     case token_type_e::type_exit:
         std::cout << "Encountered exit token, writing to output asm file" << std::endl;
         asm_file << "    mov rax, 60" << std::endl;
         asm_file << "    mov rdi, 0" << std::endl;
-        asm_file << "    syscall" << std::endl;
+
         break;
     case token_type_e::type_int_lit:
         std::cout << "Encountered int_lit token, writing to output asm file" << std::endl;
-        asm_file << "    mov rax, " << node.child_node_1->value << std::endl;
+        std::cout << "int value: " << node.int_value << std::endl;
+        asm_file << "    mov rdi, " << node.int_value << std::endl;
         break;
 
     case token_type_e::type_semi:

@@ -6,16 +6,9 @@
 
 #include "core/tokenise.hpp"
 
-enum class ast_stmt_type_e
-{
-    type_exit_stmt,
-};
-
-//ast_stmt_type_e type;
-
 struct ast_node_t
 {
-    token_type_e value;
+    token_type_e type;
     int int_value;
     std::unique_ptr<ast_node_t> child_node_1;
     std::unique_ptr<ast_node_t> child_node_2;

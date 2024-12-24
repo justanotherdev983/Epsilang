@@ -43,12 +43,12 @@ int main(int argc, char **argv)
   std::vector<token_t> tokens = tokenise(program_contents);
   std::vector<ast_node_t> ast = parse_statement(tokens);
 
-  // gen our code yes
   gen_code_for_ast(ast, output_asm);
 
-
+  std::cout << "boop" << std::endl;
   system("nasm -f elf64 -o ../output/output.o ../output/output.asm");
   system("ld -o ../output/output ../output/output.o");
+  system("../output/output");
 
 
   return 0;

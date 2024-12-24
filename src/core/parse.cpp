@@ -42,7 +42,7 @@ std::vector<ast_node_t> parse_statement(const std::vector<token_t> &token_stream
         if (token->type == token_type_e::type_exit)
         {
             ast_node_t root_node;
-            root_node.value = token->type;
+            root_node.type = token->type;
             consume_token(token_stream, token_index);
 
             if (peek_token(token_stream, token_index)->type == token_type_e::type_space)
@@ -53,7 +53,7 @@ std::vector<ast_node_t> parse_statement(const std::vector<token_t> &token_stream
             if (token && token->type == token_type_e::type_int_lit)
             {
                 root_node.child_node_1 = std::make_unique<ast_node_t>();
-                root_node.child_node_1->value = token->type;
+                root_node.child_node_1->type = token->type;
                 root_node.child_node_1->int_value = stoi(token->value);
                 consume_token(token_stream, token_index);
             }
