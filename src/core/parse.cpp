@@ -39,39 +39,80 @@ std::vector<ast_node_t> parse_statement(const std::vector<token_t> &token_stream
         const token_t* token = peek_token(token_stream, token_index);
         if (!token) break;
 
-        if (token->type == token_type_e::type_exit)
-        {
+        if (token->type == token_type_e::type_exit) {
             ast_node_t root_node;
             root_node.type = token->type;
             consume_token(token_stream, token_index);
 
+            // Handle optional space
             if (peek_token(token_stream, token_index)->type == token_type_e::type_space)
                 consume_token(token_stream, token_index);
 
-
+            // Ensure statement ends with a semicolon
             token = peek_token(token_stream, token_index);
-            if (token && token->type == token_type_e::type_int_lit)
-            {
-                root_node.child_node_1 = std::make_unique<ast_node_t>();
-                root_node.child_node_1->type = token->type;
-                root_node.child_node_1->int_value = stoi(token->value);
+            if (token && token->type == token_type_e::type_semi) {
                 consume_token(token_stream, token_index);
+            } else {
+                std::cerr << "Error: Expected ';' after 'exit' statement!" << std::endl;
             }
 
             program_ast.push_back(std::move(root_node));
         }
+
+        else if (token->type == token_type_e::type_int_lit) {
+            ast_node_t root_node;
+
+            root_node.child_node_1 = std::make_unique<ast_node_t>();
+            root_node.child_node_1->type = token->type;
+            std::cout << "Making int value first node" << stoi(token->value) << std::endl;
+            root_node.child_node_1->int_value = stoi(token->value);
+            consume_token(token_stream, token_index);
+
+            // Parse operator
+            token = peek_token(token_stream, token_index);
+            if (token && (token->type == token_type_e::type_add ||
+                          token->type == token_type_e::type_sub ||
+                          token->type == token_type_e::type_mul ||
+                          token->type == token_type_e::type_div))
+                {
+                    root_node.type = token->type;  // Set root type to operator
+                    consume_token(token_stream, token_index);
+
+                    // Parse second operand
+                    token = peek_token(token_stream, token_index);
+                    if (token && token->type == token_type_e::type_int_lit) {
+                        root_node.child_node_2 = std::make_unique<ast_node_t>();
+                        root_node.child_node_2->type = token->type;
+                        std::cout << "Making int value for second node" << stoi(token->value) << std::endl;
+                        root_node.child_node_2->int_value = stoi(token->value);
+                        consume_token(token_stream, token_index);
+                    }
+                    else {
+                        std::cerr << "Error: Expected integer literal after operator!" << std::endl;
+                    }
+                }
+
+            // Expect semicolon to end expression
+            token = peek_token(token_stream, token_index);
+            if (token && token->type == token_type_e::type_semi) {
+                consume_token(token_stream, token_index);
+            } else {
+                std::cerr << "Error: Expected ';' after expression!" << std::endl;
+            }
+
+            program_ast.push_back(std::move(root_node));
+        }
+
         else if (token->type == token_type_e::type_space)
         {
             consume_token(token_stream, token_index);
         }
         else if (token->type == token_type_e::type_semi)
         {
-            std::cout << "Semicolon encountered; End of statement" << std::endl;
             consume_token(token_stream, token_index);
         }
         else if (token->type == token_type_e::type_EOF)
         {
-            std::cout << "End of file" << std::endl;
             consume_token(token_stream, token_index);
             break;
         }
