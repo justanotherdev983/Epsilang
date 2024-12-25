@@ -48,8 +48,6 @@ int main(int argc, char **argv)
   std::cout << "boop" << std::endl;
   system("nasm -f elf64 -o ../output/output.o ../output/output.asm");
   system("ld -o ../output/output ../output/output.o");
-  system("../output/output");
-
 
   return 0;
 }

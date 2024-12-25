@@ -7,6 +7,10 @@ enum class token_type_e
 {
     type_exit,
     type_int_lit,
+    type_mul,
+    type_div,
+    type_add,
+    type_sub,
     type_semi,
     type_space,
     type_EOF,

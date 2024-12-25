@@ -26,42 +26,67 @@ void gen_code_for_ast(const std::vector<ast_node_t>& ast, std::ofstream &asm_fil
     asm_file << "    syscall" << std::endl;
 }
 
-void gen_node_code(const ast_node_t &node, std::ofstream &asm_file)
-{
-    switch (node.type)
-    {
+void gen_node_code(const ast_node_t &node, std::ofstream &asm_file) {
+    switch (node.type) {
     case token_type_e::type_exit:
         std::cout << "Encountered exit token, writing to output asm file" << std::endl;
-        asm_file << "    mov rax, 60" << std::endl;
-        asm_file << "    mov rdi, 0" << std::endl;
+        asm_file << "    mov rax, 60" << std::endl; // syscall: exit
 
         break;
+
     case token_type_e::type_int_lit:
-        std::cout << "Encountered int_lit token, writing to output asm file" << std::endl;
-        std::cout << "int value: " << node.int_value << std::endl;
-        asm_file << "    mov rdi, " << node.int_value << std::endl;
+        // Only emit if not part of an expression
+        if (!node.child_node_1 && !node.child_node_2) {
+            std::cout << "Encountered int_lit token, writing to output asm file" << std::endl;
+            asm_file << "    mov rdi, " << node.int_value << std::endl;
+        }
+        break;
+
+    case token_type_e::type_add:
+        std::cout << "Encountered add token, writing to output asm file" << std::endl;
+        asm_file << "    mov rdx, " << node.child_node_1->int_value << std::endl;
+        asm_file << "    add rdx, " << node.child_node_2->int_value << std::endl;
+        asm_file << "    mov rdi, rdx" << std::endl;
+        break;
+
+    case token_type_e::type_sub:
+        std::cout << "Encountered sub token, writing to output asm file" << std::endl;
+        asm_file << "    mov rdx, " << node.child_node_1->int_value << std::endl;
+        asm_file << "    sub rdx, " << node.child_node_2->int_value << std::endl;
+        asm_file << "    mov rdi, rdx" << std::endl;
+        break;
+
+    case token_type_e::type_mul:
+        std::cout << "Encountered mul token, writing to output asm file" << std::endl;
+        asm_file << "    mov rdx, " << node.child_node_1->int_value << std::endl;
+        asm_file << "    imul rdx, " << node.child_node_2->int_value << std::endl;
+        asm_file << "    mov rdi, rdx" << std::endl;
+        break;
+
+    case token_type_e::type_div:
+        std::cout << "Encountered div token, writing to output asm file" << std::endl;
+
+        // Save rax (no problem)
+        asm_file << "    push rax" << std::endl;
+        asm_file << "    mov rax, " << node.child_node_1->int_value << std::endl;
+        asm_file << "    xor rdx, rdx" << std::endl;
+        asm_file << "    mov rdi, " << node.child_node_2->int_value << std::endl;
+        asm_file << "    div rdi" << std::endl;
+        asm_file << "    mov rdi, rax" << std::endl;
+        asm_file << "    pop rax" << std::endl;
         break;
 
     case token_type_e::type_semi:
         std::cout << "Encountered semi token, writing to output asm file" << std::endl;
         asm_file << "    ; Semicolon encountered" << std::endl;
         break;
+
     case token_type_e::type_space:
     case token_type_e::type_EOF:
-        std::cout << "Encountered space/EOF token, continue-ing" << std::endl;
+        std::cout << "Encountered space/EOF token, continuing" << std::endl;
         break;
-    default:
-        std::cout << "Encountered unexpected token" << std::endl;
-    }
 
-    if (node.child_node_1)
-    {
-        std::cout << "Encountered child node 1, recalling function" << std::endl;
-        gen_node_code(*node.child_node_1, asm_file);
-    }
-    if (node.child_node_2)
-    {
-        std::cout << "Encountered child node 2, recalling function" << std::endl;
-        gen_node_code(*node.child_node_2, asm_file);
+    default:
+        std::cerr << "Error: Unexpected token type during code generation!" << std::endl;
     }
 }
