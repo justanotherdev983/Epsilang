@@ -14,6 +14,35 @@ std::ostream& operator<<(std::ostream& os, const token_type_e type) {
     }
 }
 
+void gen_binary_op(const ast_node_t &node, std::ofstream &asm_file) {
+    gen_node_code(*node.child_node_1, asm_file);
+    asm_file << "    push rdi" << std::endl;  // Save left operand on the stack
+
+
+    gen_node_code(*node.child_node_2, asm_file);
+    asm_file << "    pop rax" << std::endl;   // Restore left operand from stack
+
+    switch (node.type) {
+    case token_type_e::type_add:
+        asm_file << "    add rdi, rax" << std::endl;
+        break;
+    case token_type_e::type_sub:
+        asm_file << "    sub rax, rdi" << std::endl;
+        asm_file << "    mov rdi, rax" << std::endl;
+        break;
+    case token_type_e::type_mul:
+        asm_file << "    imul rdi, rax" << std::endl;
+        break;
+    case token_type_e::type_div:
+        asm_file << "    xor rdx, rdx" << std::endl;
+        asm_file << "    mov rax, rdi" << std::endl;
+        asm_file << "    div rax"      << std::endl;
+        asm_file << "    mov rdi, rax" << std::endl;
+        break;
+    default:
+        asm_file << "    ; unknown binary operator" << std::endl;
+    }
+}
 
 void gen_code_for_ast(const std::vector<ast_node_t>& ast, std::ofstream &asm_file)
 {
@@ -30,8 +59,13 @@ void gen_node_code(const ast_node_t &node, std::ofstream &asm_file) {
     switch (node.type) {
     case token_type_e::type_exit:
         std::cout << "Encountered exit token, writing to output asm file" << std::endl;
-        asm_file << "    mov rax, 60" << std::endl; // syscall: exit
 
+
+        if (node.child_node_1)
+        {
+            gen_node_code(*node.child_node_1, asm_file);
+        }
+        asm_file << "    mov rax, 60; exit syscall" << std::endl;
         break;
 
     case token_type_e::type_int_lit:
@@ -43,37 +77,14 @@ void gen_node_code(const ast_node_t &node, std::ofstream &asm_file) {
         break;
 
     case token_type_e::type_add:
-        std::cout << "Encountered add token, writing to output asm file" << std::endl;
-        asm_file << "    mov rdx, " << node.child_node_1->int_value << std::endl;
-        asm_file << "    add rdx, " << node.child_node_2->int_value << std::endl;
-        asm_file << "    mov rdi, rdx" << std::endl;
-        break;
-
     case token_type_e::type_sub:
-        std::cout << "Encountered sub token, writing to output asm file" << std::endl;
-        asm_file << "    mov rdx, " << node.child_node_1->int_value << std::endl;
-        asm_file << "    sub rdx, " << node.child_node_2->int_value << std::endl;
-        asm_file << "    mov rdi, rdx" << std::endl;
-        break;
-
     case token_type_e::type_mul:
-        std::cout << "Encountered mul token, writing to output asm file" << std::endl;
-        asm_file << "    mov rdx, " << node.child_node_1->int_value << std::endl;
-        asm_file << "    imul rdx, " << node.child_node_2->int_value << std::endl;
-        asm_file << "    mov rdi, rdx" << std::endl;
-        break;
-
     case token_type_e::type_div:
-        std::cout << "Encountered div token, writing to output asm file" << std::endl;
-
-        // Save rax (no problem)
-        asm_file << "    push rax" << std::endl;
-        asm_file << "    mov rax, " << node.child_node_1->int_value << std::endl;
-        asm_file << "    xor rdx, rdx" << std::endl;
-        asm_file << "    mov rdi, " << node.child_node_2->int_value << std::endl;
-        asm_file << "    div rdi" << std::endl;
-        asm_file << "    mov rdi, rax" << std::endl;
-        asm_file << "    pop rax" << std::endl;
+        if (!node.child_node_1 || !node.child_node_2) {
+            std::cerr << "Error: Binary operator missing operands" << std::endl;
+            return;
+        }
+        gen_binary_op(node, asm_file);
         break;
 
     case token_type_e::type_semi:

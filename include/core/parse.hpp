@@ -17,4 +17,10 @@ struct ast_node_t
 const token_t* peek_token(const std::vector<token_t>& tokens, const size_t &index);
 const token_t* consume_token(const std::vector<token_t>& tokens, size_t &index);
 
-std::vector<ast_node_t> parse_statement(const std::vector<token_t> &token_stream);
+void parse_factor(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node);
+void parse_term(std::vector<token_t>& tokens, size_t& index, ast_node_t& root_node);
+void parse_expression(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node);
+
+void parse_exit_statement(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node);
+
+std::vector<ast_node_t> parse_statement(std::vector<token_t>& token_stream);

@@ -13,7 +13,7 @@ EpsiLang is a compiled programming language built from scratch, targeting x86_64
 
 - CMake (3.x or higher)
 - C++ compiler with C++20 support
-- NASM assembler
+- FASM assembler
 - Linux environment (x86_64)
 
 ## Building from Source
@@ -51,9 +51,9 @@ echo $?
 ```
 
 ## Language support
-Currently, EpsiLang supports simple exit statements:
+Currently, EpsiLang supports simple exit statements and simple mathematical operations:
 ```code
-exit 43;
+exit 4*3;
 ```
 ```mermaid
 
