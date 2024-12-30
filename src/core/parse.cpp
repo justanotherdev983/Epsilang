@@ -57,7 +57,7 @@ void parse_factor(std::vector<token_t>& tokens, size_t& token_index, ast_node_t&
     if (token->type == token_type_e::type_int_lit) {
         root_node.type = token->type;
         root_node.int_value = stoi(token->value);
-        info_msg("Parsed integer literal: {}", root_node.int_value);
+        info_msg("Parsed integer literal: ", root_node.int_value);
         consume_token(tokens, token_index);
     }
     else if (token->type == token_type_e::type_open_paren) {
@@ -66,13 +66,13 @@ void parse_factor(std::vector<token_t>& tokens, size_t& token_index, ast_node_t&
 
         token = peek_token(tokens, token_index);
         if (!token || token->type != token_type_e::type_close_paren) {
-            error_msg("Expected ')' but not found: {}", token->type);
+            error_msg("Expected ')', but didn't find it.");
             return;
         }
         consume_token(tokens, token_index);
     }
     else {
-        error_msg("[ERROR]: Invalid factor, expected integer literal or '(' but found: {}", token_type_to_string(token->type));
+        error_msg("[ERROR]: Invalid factor, expected integer literal or '(' but found: ", token_type_to_string(token->type));
     }
 }
 
@@ -130,7 +130,7 @@ void parse_exit_statement(std::vector<token_t>& tokens, size_t& token_index, ast
 
     const token_t* token = peek_token(tokens, token_index);
     if (!token || token->type != token_type_e::type_open_paren) {
-        error_msg("Expected ')' but found: {}", token_type_to_string(token->type));
+        error_msg("Expected ')' but found: ", token_type_to_string(token->type));
         return;
     }
     consume_token(tokens, token_index);
@@ -142,7 +142,7 @@ void parse_exit_statement(std::vector<token_t>& tokens, size_t& token_index, ast
 
     token = peek_token(tokens, token_index);
     if (!token || token->type != token_type_e::type_close_paren) {
-        error_msg("Expected ')' in exit statement, but found: {}", token_type_to_string(token->type));
+        error_msg("Expected ')' in exit statement, but found: ", token_type_to_string(token->type));
         return;
     }
     consume_token(tokens, token_index);
@@ -150,7 +150,7 @@ void parse_exit_statement(std::vector<token_t>& tokens, size_t& token_index, ast
     // Check for semicolon
     token = peek_token(tokens, token_index);
     if (!token || token->type != token_type_e::type_semi) {
-        error_msg("Expected ';' after exit statement, but found: {}", token_type_to_string(token->type));
+        error_msg("Expected ';' after exit statement, but found: ", token_type_to_string(token->type));
         return;
     }
     consume_token(tokens, token_index);
@@ -192,7 +192,7 @@ std::vector<ast_node_t> parse_statement(std::vector<token_t>& token_stream) {
             if (token && token->type == token_type_e::type_semi) {
                 consume_token(token_stream, token_index);
             } else {
-                error_msg("Expected ';' after expression, but found: {}", token_type_to_string(token->type));
+                error_msg("Expected ';' after expression, but found: ", token_type_to_string(token->type));
             }
 
             program_ast.push_back(std::move(root_node));
@@ -201,7 +201,7 @@ std::vector<ast_node_t> parse_statement(std::vector<token_t>& token_stream) {
             break;
         }
         else {
-            error_msg("Unexpected token type: {}", token_type_to_string(token->type));
+            error_msg("Unexpected token type: ", token_type_to_string(token->type));
             consume_token(token_stream, token_index);
         }
     }
