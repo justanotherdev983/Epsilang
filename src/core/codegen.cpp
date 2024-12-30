@@ -1,7 +1,8 @@
-#include "core/codegen.hpp"
-
 #include <fstream>
-#include <iostream>
+
+#include "core/codegen.hpp"
+#include "utils/error.hpp"
+
 
 std::ostream& operator<<(std::ostream& os, const token_type_e type) {
     switch (type) {
@@ -60,7 +61,7 @@ void gen_code_for_ast(const std::vector<ast_node_t>& ast, std::ofstream &asm_fil
 void gen_node_code(const ast_node_t &node, std::ofstream &asm_file) {
     switch (node.type) {
     case token_type_e::type_exit:
-        std::cout << "Encountered exit token, writing to output asm file" << std::endl;
+        info_msg("Encountered exit token, writing to output asm file");
 
 
         if (node.child_node_1)
@@ -73,7 +74,7 @@ void gen_node_code(const ast_node_t &node, std::ofstream &asm_file) {
     case token_type_e::type_int_lit:
         // Only emit if not part of an expression
         if (!node.child_node_1 && !node.child_node_2) {
-            std::cout << "Encountered int_lit token, writing to output asm file" << std::endl;
+            info_msg("Encountered int_lit token, writing to output asm file");
             asm_file << "    mov rdi, " << node.int_value << std::endl;
         }
         break;
@@ -83,23 +84,23 @@ void gen_node_code(const ast_node_t &node, std::ofstream &asm_file) {
     case token_type_e::type_mul:
     case token_type_e::type_div:
         if (!node.child_node_1 || !node.child_node_2) {
-            std::cerr << "Error: Binary operator missing operands" << std::endl;
+            error_msg("Binary operator missing operands");
             return;
         }
         gen_binary_op(node, asm_file);
         break;
 
     case token_type_e::type_semi:
-        std::cout << "Encountered semi token, writing to output asm file" << std::endl;
+        info_msg("Encountered semi token, writing to output asm file");
         asm_file << "    ; Semicolon encountered" << std::endl;
         break;
 
     case token_type_e::type_space:
     case token_type_e::type_EOF:
-        std::cout << "Encountered space/EOF token, continuing" << std::endl;
+        info_msg("Encountered space/EOF token, writing to output asm file");
         break;
 
     default:
-        std::cerr << "Error: Unexpected token type during code generation!" << std::endl;
+        error_msg("Encountered unknown token type in codegen");
     }
 }

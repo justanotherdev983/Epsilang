@@ -16,22 +16,24 @@ std::string program_contents;
 
 int main(int argc, char **argv)
 {
+  info_msg("Outputted binary is found in output/output");
   if (argc != 2)
   {
-    std::cout << "Incorrect usage, please specify the file\n";
-    std::cout << "Correct usage: ./epsilang <Filename.eps>\n";
+    error_msg("Incorrect usage, please specify the file");
+    info_msg("Correct usage is: ./epsilang <Filename.eps>");
+
     return 1;
   }
 
   std::ofstream output_asm("../output/output.asm");
   if (!output_asm) {
-    std::cerr << "Error: Could not open output file '../output/output.asm'\n";
+    error_msg("Could not open output file '../output/output.asm'");
     return 1;
   }
 
   std::ifstream input_file(argv[1]);
   if (!input_file) {
-    std::cerr << "Error: Could not open file " << argv[1] << "\n";
+    error_msg("Could not open file: ", argv[1]);
     return 1;
   }
 
@@ -40,7 +42,7 @@ int main(int argc, char **argv)
     program_contents += line_buf + '\n';
   }
 
-  std::cout << "File contents: " << program_contents << "\n";
+  info_msg("File contents: ", program_contents);
 
 
 
@@ -52,6 +54,11 @@ int main(int argc, char **argv)
 
   system("fasm ../output/output.asm ../output/output.o");
   system("ld -o ../output/output ../output/output.o");
+
+  info_msg("Outputted binary is found in output/output.asm");
+  info_msg("Error count: {}", get_error_count());
+  reset_error_count();
+
 
   return 0;
 }

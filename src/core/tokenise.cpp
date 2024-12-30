@@ -1,11 +1,7 @@
 #include <string>
-#include <stdexcept>
-
-#include "core/tokenise.hpp"
-
-#include <iostream>
 #include <ostream>
 
+#include "core/tokenise.hpp"
 #include "utils/error.hpp"
 
 
@@ -55,7 +51,7 @@ std::vector<token_t> tokenise(const std::string &contents) {
             }
             else
             {
-                throw std::runtime_error("Invalid keyword");
+                error_msg("Invalid keyword");
             }
         }
         else if (peek(contents, token_index) == '*') {
@@ -93,7 +89,7 @@ std::vector<token_t> tokenise(const std::string &contents) {
             }
         }
         else {
-            throw std::runtime_error("Invalid token");
+            error_msg("Invalid token");
         }
 
         tokens.push_back(curr_token);
