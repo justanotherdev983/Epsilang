@@ -20,7 +20,7 @@ EpsiLang is a compiled programming language built from scratch, targeting x86_64
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/epsilang.git
+git clone https://github.com/justanotherdev983/epsilang.git
 cd epsilang
 
 # Create build directory
@@ -34,7 +34,7 @@ make
 ## Running Epsilang programs
 1. Create a source file with .eps extension
 2. Use the compiler to generate assembly
-3.   The resulting program will be in the output directory
+3. The resulting program will be in the output directory
 
 ### Example
 
@@ -51,9 +51,9 @@ echo $?
 ```
 
 ## Language support
-Currently, EpsiLang supports simple exit statements and simple mathematical operations:
+Currently, EpsiLang supports  exit statements and mathematical operations with order precedence:
 ```code
-exit 4*3;
+exit(4+2*3);
 ```
 ```mermaid
 
