@@ -16,7 +16,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y clang-format valgrind cmake build-essential fasm
+          sudo apt install -y clang-format valgrind cmake build-essential fasm clang
+          sudo apt install -y libfmt-dev  # Install fmt library
 
       - name: Check formatting
         run: |
