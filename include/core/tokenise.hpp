@@ -11,6 +11,8 @@ enum class token_type_e
     type_div,
     type_add,
     type_sub,
+    type_open_paren,
+    type_close_paren,
     type_semi,
     type_space,
     type_EOF,

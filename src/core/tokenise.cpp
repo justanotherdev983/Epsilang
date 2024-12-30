@@ -78,6 +78,14 @@ std::vector<token_t> tokenise(const std::string &contents) {
             curr_token.type = token_type_e::type_semi;
             curr_token.value = std::string(1, consume(contents, token_index));
         }
+        else if (peek(contents, token_index) == '(') {
+            curr_token.type = token_type_e::type_open_paren;
+            curr_token.value = std::string(1, consume(contents, token_index));
+        }
+        else if (peek(contents, token_index) == ')') {
+            curr_token.type = token_type_e::type_close_paren;
+            curr_token.value = std::string(1, consume(contents, token_index));
+        }
         else if (isspace(peek(contents, token_index))) {
             while (isspace(peek(contents, token_index))) {
                 curr_token.type = token_type_e::type_space;

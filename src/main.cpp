@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <iterator>
 #include <string>
 
 #include "core/parse.hpp"
@@ -34,7 +35,11 @@ int main(int argc, char **argv)
     return 1;
   }
 
-  std::getline(input_file, program_contents);
+  std::string line_buf;
+  while (std::getline(input_file, line_buf)) {
+    program_contents += line_buf + '\n';
+  }
+
   std::cout << "File contents: " << program_contents << "\n";
 
 
@@ -45,7 +50,6 @@ int main(int argc, char **argv)
 
   gen_code_for_ast(ast, output_asm);
 
-  std::cout << "boop" << std::endl;
   system("nasm -f elf64 -o ../output/output.o ../output/output.asm");
   system("ld -o ../output/output ../output/output.o");
 
