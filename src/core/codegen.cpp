@@ -46,7 +46,9 @@ void gen_binary_op(const ast_node_t &node, std::ofstream &asm_file) {
 
 void gen_code_for_ast(const std::vector<ast_node_t>& ast, std::ofstream &asm_file)
 {
-    asm_file << "global _start" << std::endl;
+    asm_file << "format ELF64" << std::endl;
+    asm_file << "section '.text' executable" << std::endl << std::endl;
+    asm_file << "public _start" << std::endl;
     asm_file << "_start:" << std::endl;
 
     for (const auto& node : ast) {

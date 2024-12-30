@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 
   gen_code_for_ast(ast, output_asm);
 
-  system("nasm -f elf64 -o ../output/output.o ../output/output.asm");
+  system("fasm ../output/output.asm ../output/output.o");
   system("ld -o ../output/output ../output/output.o");
 
   return 0;
