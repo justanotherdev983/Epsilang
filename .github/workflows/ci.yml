@@ -35,6 +35,17 @@ jobs:
           sudo update-alternatives --set clang /usr/bin/clang-17
           sudo update-alternatives --set clang++ /usr/bin/clang++-17
 
+          # Ensure the path is pointing to the right Clang binaries
+          export PATH=/usr/lib/llvm-17/bin:$PATH
+
+      - name: Debugging Clang version
+        run: |
+          echo "Checking Clang version and path..."
+          which clang
+          which clang++
+          clang --version
+          clang++ --version
+
       - name: Verify Compiler and Standard Library
         run: |
           clang++ --version
