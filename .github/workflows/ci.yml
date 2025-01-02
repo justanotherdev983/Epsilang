@@ -19,9 +19,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y clang-15 libc++-15-dev libc++abi-15-dev libfmt-dev valgrind cmake build-essential
-          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100
-          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-15 100
+          sudo apt install -y clang-format valgrind cmake build-essential fasm clang libc++-dev libc++abi-dev
+          sudo apt install -y libfmt-dev  # Install fmt library
 
       - name: Check formatting
         run: |
@@ -47,7 +46,7 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          cmake .. -DCMAKE_CXX_STANDARD=20
+          cmake .. -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_FLAGS="-stdlib=libc++"
 
       - name: Build
         run: |
