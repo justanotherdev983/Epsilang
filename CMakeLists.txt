@@ -32,4 +32,4 @@ add_executable(epsilang ${SOURCES})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
 
 # Compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -g -DCMAKE_EXPORT_COMPILE_COMMANDS=1")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -g3 -fno-omit-frame-pointer -DCMAKE_EXPORT_COMPILE_COMMANDS=1")

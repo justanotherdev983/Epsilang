@@ -38,6 +38,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y cmake build-essential fasm libfmt-dev valgrind
+          sudo apt install -y libc++abi-17-dbg libc++-17-dbg || true
 
       - name: Create Build Environment
         run: |
@@ -57,7 +58,7 @@ jobs:
       - name: Run Valgrind
         run: |
           cd build
-          valgrind --leak-check=full --error-exitcode=1 ./epsilang
+          DEBUGINFOD_URLS="" valgrind --leak-check=full --track-origins=yes --error-exitcode=1 ./epsilang
 
       - name: Commit and Push Formatting Changes
         run: |
