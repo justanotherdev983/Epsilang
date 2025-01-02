@@ -16,66 +16,57 @@ jobs:
         with:
           persist-credentials: true
 
-      - name: Install LLVM Toolchain
+      - name: Install LLVM and Clang
         run: |
-          sudo apt update
-          sudo apt install -y wget gnupg lsb-release software-properties-common
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 17
-
-      - name: Install dependencies
-        run: |
+          sudo ./llvm.sh 17 all
           sudo apt update
-          sudo apt install -y clang-17 libc++-17-dev libc++abi-17-dev cmake build-essential fasm libfmt-dev
-          
-          # Set clang-17 as the default clang
+          sudo apt install -y clang-17 lldb-17 lld-17 clangd-17 clang-tidy-17 clang-format-17 libc++-17-dev libc++abi-17-dev
+
+      - name: Set up Clang
+        run: |
+          sudo update-alternatives --remove-all clang || true
+          sudo update-alternatives --remove-all clang++ || true
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-17 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-17 100
           sudo update-alternatives --set clang /usr/bin/clang-17
           sudo update-alternatives --set clang++ /usr/bin/clang++-17
+          echo "PATH=/usr/lib/llvm-17/bin:$PATH" >> $GITHUB_ENV
 
-          # Ensure the path is pointing to the right Clang binaries
-          export PATH=/usr/lib/llvm-17/bin:$PATH
-
-      - name: Debugging Clang version
+      - name: Install other dependencies
         run: |
-          echo "Checking Clang version and path..."
-          which clang
+          sudo apt update
+          sudo apt install -y cmake build-essential fasm libfmt-dev valgrind
+
+      - name: Verify Clang installation
+        run: |
+          clang++ --version
           which clang++
-          clang --version
-          clang++ --version
-
-      - name: Verify Compiler and Standard Library
-        run: |
-          clang++ --version
-          echo | clang++ -E -dM - | grep __cplusplus
-          ls /usr/include/c++/v1/ | grep fstream || echo "<fstream> not found!"
+          ls -l $(which clang++)
+          echo "LLVM lib directory contents:"
+          ls -la /usr/lib/llvm-17/bin/
 
       - name: Create Build Environment
         run: |
           mkdir -p build
           cd build
-          cmake .. -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_C_COMPILER=/usr/bin/clang
+          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
 
       - name: Build
         run: |
           cd build
-          make
+          make VERBOSE=1
 
       - name: Run Valgrind
         run: |
-          valgrind --leak-check=full --error-exitcode=1 ./build/.epsilang
+          cd build
+          valgrind --leak-check=full --error-exitcode=1 ./.epsilang
 
-      - name: Commit and Push Formatting Changes (if any)
+      - name: Commit and Push Formatting Changes
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
-          find . -name '*.c' -o -name '*.h' | xargs clang-format -i -style=file
+          find . -name '*.c' -o -name '*.h' | xargs clang-format-17 -i -style=file
           git add .
-          if git diff --cached --exit-code; then
-            echo "No formatting changes detected."
-          else
-            git commit -m "Apply clang-format style changes"
-            git push
-          fi
+          git diff --cached --quiet || git commit -m "Apply clang-format style changes" && git push

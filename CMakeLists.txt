@@ -6,9 +6,6 @@ project(epsilang)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-
 
 # List all source files
 set(SOURCES
