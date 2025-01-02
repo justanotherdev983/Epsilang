@@ -28,20 +28,24 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y clang-17 libc++-17-dev libc++abi-17-dev cmake build-essential fasm libfmt-dev
+          
+          # Set clang-17 as the default clang
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-17 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-17 100
+          sudo update-alternatives --set clang /usr/bin/clang-17
+          sudo update-alternatives --set clang++ /usr/bin/clang++-17
 
       - name: Verify Compiler and Standard Library
         run: |
-          clang++-17 --version
-          echo | clang++-17 -E -dM - | grep __cplusplus
+          clang++ --version
+          echo | clang++ -E -dM - | grep __cplusplus
           ls /usr/include/c++/v1/ | grep fstream || echo "<fstream> not found!"
 
       - name: Create Build Environment
         run: |
           mkdir -p build
           cd build
-          cmake .. -DCMAKE_CXX_COMPILER=/usr/bin/clang++-17 -DCMAKE_C_COMPILER=/usr/bin/clang-17
+          cmake .. -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_C_COMPILER=/usr/bin/clang
 
       - name: Build
         run: |
