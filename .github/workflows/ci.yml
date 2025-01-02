@@ -22,7 +22,7 @@ jobs:
           chmod +x llvm.sh
           sudo ./llvm.sh 17 all
           sudo apt update
-          sudo apt install -y clang-17 lldb-17 lld-17 clangd-17 clang-tidy-17 clang-format-17 libc++-17-dev libc++abi-17-dev
+          sudo apt install -y clang-17 libc++-17-dev libc++abi-17-dev
 
       - name: Set up Clang
         run: |
@@ -39,19 +39,15 @@ jobs:
           sudo apt update
           sudo apt install -y cmake build-essential fasm libfmt-dev valgrind
 
-      - name: Verify Clang installation
-        run: |
-          clang++ --version
-          which clang++
-          ls -l $(which clang++)
-          echo "LLVM lib directory contents:"
-          ls -la /usr/lib/llvm-17/bin/
-
       - name: Create Build Environment
         run: |
           mkdir -p build
           cd build
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
+          cmake -DCMAKE_C_COMPILER=clang \
+                -DCMAKE_CXX_COMPILER=clang++ \
+                -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+                -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -lc++abi" \
+                ..
 
       - name: Build
         run: |
