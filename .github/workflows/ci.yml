@@ -34,7 +34,7 @@ jobs:
       - name: Verify Compiler and Standard Library
         run: |
           clang++ --version
-          echo | clang++ -std=c++20 -stdlib=libc++ -E -dM - | grep __cplusplus
+          echo | clang++ -E -dM - | grep __cplusplus
           ls /usr/include/c++/v1/ | grep fstream || echo "<fstream> not found!"
 
       - name: Create Build Environment
