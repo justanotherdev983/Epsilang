@@ -19,34 +19,22 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y clang-format valgrind cmake build-essential fasm clang libc++-dev
-          sudo apt install -y libfmt-dev  # Install fmt library
+          sudo apt install -y clang-17 libc++-17-dev libc++abi-17-dev cmake build-essential fasm
+          sudo apt install -y libfmt-dev
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-17 100
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-17 100
 
-      - name: Check formatting
+      - name: Verify Compiler and Standard Library
         run: |
-          find . -name '*.c' -o -name '*.h' | xargs clang-format --dry-run -style=file
+          clang++ --version
+          echo | clang++ -std=c++20 -stdlib=libc++ -E -dM - | grep __cplusplus
+          ls /usr/include/c++/v1/ | grep fstream || echo "<fstream> not found!"
 
-      - name: Auto-correct formatting
-        run: |
-          find . -name '*.c' -o -name '*.h' | xargs clang-format -i -style=file
-
-      - name: Commit and push changes if any
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          git add .
-          if git diff --cached --exit-code; then
-            echo "No formatting changes detected."
-          else
-            git commit -m "Apply clang-format style changes"
-            git push
-          fi
-
-      - name: Create CMake environment
+      - name: Create Build Environment
         run: |
           mkdir -p build
           cd build
-          cmake .. -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_FLAGS="-stdlib=libc++"
+          cmake .. -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++ -lc++abi" -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++"
 
       - name: Build
         run: |
@@ -56,3 +44,16 @@ jobs:
       - name: Run Valgrind
         run: |
           valgrind --leak-check=full --error-exitcode=1 ./build/.epsilang
+
+      - name: Commit and Push Formatting Changes (if any)
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          find . -name '*.c' -o -name '*.h' | xargs clang-format -i -style=file
+          git add .
+          if git diff --cached --exit-code; then
+            echo "No formatting changes detected."
+          else
+            git commit -m "Apply clang-format style changes"
+            git push
+          fi
