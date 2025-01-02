@@ -16,7 +16,13 @@ jobs:
         with:
           persist-credentials: true
 
-
+      - name: Install LLVM Toolchain
+        run: |
+          sudo apt update
+          sudo apt install -y wget gnupg lsb-release software-properties-common
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 17
 
       - name: Install dependencies
         run: |
