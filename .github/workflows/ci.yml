@@ -33,15 +33,15 @@ jobs:
 
       - name: Verify Compiler and Standard Library
         run: |
-          clang++ --version
-          echo | clang++ -E -dM - | grep __cplusplus
+          clang++-17 --version
+          echo | clang++-17 -E -dM - | grep __cplusplus
           ls /usr/include/c++/v1/ | grep fstream || echo "<fstream> not found!"
 
       - name: Create Build Environment
         run: |
           mkdir -p build
           cd build
-          cmake ..
+          cmake .. -DCMAKE_CXX_COMPILER=/usr/bin/clang++-17 -DCMAKE_C_COMPILER=/usr/bin/clang-17
 
       - name: Build
         run: |
