@@ -6,6 +6,9 @@
 enum class token_type_e
 {
     type_exit,
+    type_let,
+    type_variable_name,
+    type_equal,
     type_int_lit,
     type_mul,
     type_div,

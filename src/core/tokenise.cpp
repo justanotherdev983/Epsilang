@@ -48,6 +48,14 @@ std::vector<token_t> tokenise(const std::string &contents) {
             if (word == "exit")
             {
                 curr_token.type = token_type_e::type_exit;
+            } else if(word == "let") 
+            {
+                curr_token.type = token_type_e::type_let;
+                while (isalpha(peek(contents, token_index))) {
+                    std::string variable_name;
+                    variable_name += peek(contents, token_index);
+                    consume(contents, token_index);
+                }
             }
             else
             {

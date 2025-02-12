@@ -58,6 +58,19 @@ void gen_code_for_ast(const std::vector<ast_node_t>& ast, std::ofstream &asm_fil
     asm_file << "    syscall" << std::endl;
 }
 
+void push_var_on_stack(const ast_node_t& node, std::ofstream &asm_file) {
+    switch (node.type) {
+        case token_type_e::type_let:
+            asm_file << "    mov rdi, " << node.int_value << std::endl;
+            break; 
+            if (node.child_node_1)
+            {
+                push_var_on_stack(*node.child_node_1, asm_file);
+            }
+        default:
+    }
+}
+
 void gen_node_code(const ast_node_t &node, std::ofstream &asm_file) {
     switch (node.type) {
     case token_type_e::type_exit:
