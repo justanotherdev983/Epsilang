@@ -35,6 +35,9 @@ bool is_math_operator(const token_t& token)
 std::string token_type_to_string(token_type_e type) {
     switch (type) {
     case token_type_e::type_exit: return "type_exit";
+    case token_type_e::type_let: return "type_let";
+    case token_type_e::type_identifier: return "type_variable_name";
+    case token_type_e::type_equal: return "type_equal";
     case token_type_e::type_int_lit: return "type_int_lit";
     case token_type_e::type_semi: return "type_semi";
     case token_type_e::type_space: return "type_space";
@@ -155,10 +158,51 @@ void parse_exit_statement(std::vector<token_t>& tokens, size_t& token_index, ast
     }
     consume_token(tokens, token_index);
 
-    // Create exit node with expression as child
+    // Create let node with expression as child
     root_node.type = token_type_e::type_exit;
     root_node.child_node_1 = std::make_unique<ast_node_t>(std::move(expr_node));
 }
+
+void parse_let_statement(std::vector<token_t>& tokens, size_t &token_index, ast_node_t& root_node) {
+    consume_token(tokens, token_index); // Let token
+
+    const token_t* id_token = peek_token(tokens, token_index);
+    if (!id_token || id_token->type != token_type_e::type_identifier) {
+        error_msg("Expected variable name but found: ", token_type_to_string(id_token->type));
+        return;
+    }
+
+    // Create an identifier node
+    ast_node_t identifier_node;
+    identifier_node.type = token_type_e::type_identifier;
+    identifier_node.string_value = id_token->value; // Store the identifier name
+    consume_token(tokens, token_index); // Consume the identifier token
+
+    const token_t* equal_token = peek_token(tokens, token_index);
+    if (!equal_token || equal_token->type != token_type_e::type_equal) {
+        error_msg("Expected '=' in let statement, but found: ", token_type_to_string(equal_token->type));
+        return;
+    }
+    consume_token(tokens, token_index); // Consume the '=' token
+
+    // Parse the expression
+    ast_node_t expr_node;
+    parse_expression(tokens, token_index, expr_node);
+
+    // Create an assignment node
+    root_node.type = token_type_e::type_let; 
+    root_node.child_node_1 = std::make_unique<ast_node_t>(std::move(identifier_node)); // Left child is the identifier
+    root_node.child_node_2 = std::make_unique<ast_node_t>(std::move(expr_node));       // Right child is the expression
+
+    // Check for semicolon
+    const token_t* semi_token = peek_token(tokens, token_index);
+    if (!semi_token || semi_token->type != token_type_e::type_semi) {
+        error_msg("Expected ';' after let statement, but found: ", token_type_to_string(semi_token->type));
+        return;
+    }
+    consume_token(tokens, token_index); // Consume the ';' token
+}
+
 
 // Parse program statements
 std::vector<ast_node_t> parse_statement(std::vector<token_t>& token_stream) {
@@ -195,6 +239,10 @@ std::vector<ast_node_t> parse_statement(std::vector<token_t>& token_stream) {
                 error_msg("Expected ';' after expression, but found: ", token_type_to_string(token->type));
             }
 
+            program_ast.push_back(std::move(root_node));
+        } else if(token->type == token_type_e::type_let) {
+            ast_node_t root_node;
+            parse_let_statement(token_stream, token_index, root_node);
             program_ast.push_back(std::move(root_node));
         }
         else if (token->type == token_type_e::type_EOF) {
