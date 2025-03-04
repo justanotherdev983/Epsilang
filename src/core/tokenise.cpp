@@ -28,6 +28,14 @@ std::vector<token_t> tokenise(const std::string &contents) {
     size_t token_index = 0;
 
     while (peek(contents, token_index) != '\0') {
+        // Skip any whitespace characters
+        if (isspace(peek(contents, token_index))) {
+            while (isspace(peek(contents, token_index))) {
+                consume(contents, token_index);
+            }
+            continue;  // Do not create a token for whitespace.
+        }
+
         token_t curr_token;
 
         if (isdigit(peek(contents, token_index))) {
@@ -46,21 +54,12 @@ std::vector<token_t> tokenise(const std::string &contents) {
                 consume(contents, token_index);
             }
             if (word == "exit")
-            {
                 curr_token.type = token_type_e::type_exit;
-            } else if(word == "let") 
-            {
+            else if (word == "let")
                 curr_token.type = token_type_e::type_let;
-                while (isalpha(peek(contents, token_index))) {
-                    std::string variable_name;
-                    variable_name += peek(contents, token_index);
-                    consume(contents, token_index);
-                }
-            }
             else
-            {
-                error_msg("Invalid keyword");
-            }
+                curr_token.type = token_type_e::type_identifier;
+            curr_token.value = word;
         }
         else if (peek(contents, token_index) == '*') {
             curr_token.type = token_type_e::type_mul;
@@ -90,20 +89,20 @@ std::vector<token_t> tokenise(const std::string &contents) {
             curr_token.type = token_type_e::type_close_paren;
             curr_token.value = std::string(1, consume(contents, token_index));
         }
-        else if (isspace(peek(contents, token_index))) {
-            while (isspace(peek(contents, token_index))) {
-                curr_token.type = token_type_e::type_space;
-                consume(contents, token_index);
-            }
+        else if (peek(contents, token_index) == '=') {
+            curr_token.type = token_type_e::type_equal;
+            curr_token.value = std::string(1, consume(contents, token_index));
         }
         else {
             error_msg("Invalid token");
+            consume(contents, token_index); // Consume unknown character
+            continue;
         }
 
         tokens.push_back(curr_token);
     }
 
-    // Add EOF token
+    // Append the EOF token.
     token_t eof_token;
     eof_token.type = token_type_e::type_EOF;
     tokens.push_back(eof_token);

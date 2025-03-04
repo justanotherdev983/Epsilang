@@ -1,0 +1,26 @@
+[
+{
+  "directory": "/home/bou/code/git/Epsilang/build",
+  "command": "/usr/bin/clang++  -I/home/bou/code/git/Epsilang/include  -Wall -Wextra -g3 -fno-omit-frame-pointer -std=gnu++20 -o CMakeFiles/epsilang.dir/src/core/codegen.cpp.o -c /home/bou/code/git/Epsilang/src/core/codegen.cpp",
+  "file": "/home/bou/code/git/Epsilang/src/core/codegen.cpp",
+  "output": "CMakeFiles/epsilang.dir/src/core/codegen.cpp.o"
+},
+{
+  "directory": "/home/bou/code/git/Epsilang/build",
+  "command": "/usr/bin/clang++  -I/home/bou/code/git/Epsilang/include  -Wall -Wextra -g3 -fno-omit-frame-pointer -std=gnu++20 -o CMakeFiles/epsilang.dir/src/core/parse.cpp.o -c /home/bou/code/git/Epsilang/src/core/parse.cpp",
+  "file": "/home/bou/code/git/Epsilang/src/core/parse.cpp",
+  "output": "CMakeFiles/epsilang.dir/src/core/parse.cpp.o"
+},
+{
+  "directory": "/home/bou/code/git/Epsilang/build",
+  "command": "/usr/bin/clang++  -I/home/bou/code/git/Epsilang/include  -Wall -Wextra -g3 -fno-omit-frame-pointer -std=gnu++20 -o CMakeFiles/epsilang.dir/src/core/tokenise.cpp.o -c /home/bou/code/git/Epsilang/src/core/tokenise.cpp",
+  "file": "/home/bou/code/git/Epsilang/src/core/tokenise.cpp",
+  "output": "CMakeFiles/epsilang.dir/src/core/tokenise.cpp.o"
+},
+{
+  "directory": "/home/bou/code/git/Epsilang/build",
+  "command": "/usr/bin/clang++  -I/home/bou/code/git/Epsilang/include  -Wall -Wextra -g3 -fno-omit-frame-pointer -std=gnu++20 -o CMakeFiles/epsilang.dir/src/main.cpp.o -c /home/bou/code/git/Epsilang/src/main.cpp",
+  "file": "/home/bou/code/git/Epsilang/src/main.cpp",
+  "output": "CMakeFiles/epsilang.dir/src/main.cpp.o"
+}
+]

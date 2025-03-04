@@ -7,7 +7,7 @@ enum class token_type_e
 {
     type_exit,
     type_let,
-    type_variable_name,
+    type_identifier,
     type_equal,
     type_int_lit,
     type_mul,
@@ -25,6 +25,7 @@ struct token_t
 {
     token_type_e type;
     std::string value;
+    std::string identifier;
 };
 
 char consume(const std::string &contents, size_t &token_index);
