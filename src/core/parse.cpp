@@ -2,6 +2,7 @@
 #include <string>
 
 #include "core/parse.hpp"
+#include "core/tokenise.hpp"
 #include "utils/error.hpp"
 
 const token_t* peek_token(const std::vector<token_t>& tokens, const size_t &index) {
@@ -203,6 +204,27 @@ void parse_let_statement(std::vector<token_t>& tokens, size_t &token_index, ast_
     consume_token(tokens, token_index); // Consume the ';' token
 }
 
+void parse_if_statement(std::vector<token_t>& tokens, size_t &token_index, ast_node_t& root_node) {
+    consume_token(tokens, token_index); // if token
+    
+    const token_t* open_paren = peek_token(tokens, token_index);
+    if (!open_paren || open_paren->type != token_type_e::type_open_paren) {
+        error_msg("Expected '(' after let statement, but found: ", token_type_to_string(open_paren->type));
+        return;
+    }
+    
+    // condition
+    
+    // close paren
+    
+    // open_squigly
+    
+    // then-statement
+    
+    // close_squigly
+    
+    // optional else branch
+}
 
 // Parse program statements
 std::vector<ast_node_t> parse_statement(std::vector<token_t>& token_stream) {
@@ -243,6 +265,10 @@ std::vector<ast_node_t> parse_statement(std::vector<token_t>& token_stream) {
         } else if(token->type == token_type_e::type_let) {
             ast_node_t root_node;
             parse_let_statement(token_stream, token_index, root_node);
+            program_ast.push_back(std::move(root_node));
+        } else if (token->type == token_type_e::type_if) {
+            ast_node_t root_node;
+            parse_if_statement(token_stream, token_index, root_node);
             program_ast.push_back(std::move(root_node));
         }
         else if (token->type == token_type_e::type_EOF) {
