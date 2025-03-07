@@ -40,4 +40,4 @@ jobs:
 
       - name: Run Valgrind
         run: |
-          valgrind --leak-check=full --error-exitcode=1 ./build/.epsilang
+          valgrind --leak-check=full --error-exitcode=1 ./build/epsilang
