@@ -62,18 +62,7 @@ std::vector<token_t> tokenise(const std::string &contents) {
             }
             else if (word == "else") {
                 curr_token.type = token_type_e::type_else;
-            } else if (word == "==") {
-                curr_token.type = token_type_e::type_eq;
-            } else if (word == "=/=") {
-                curr_token.type = token_type_e::type_nq;
-            } else if (word == ">=") {
-                curr_token.type = token_type_e::type_ge;
-            } else if (word == "<=") {
-                curr_token.type = token_type_e::type_le;
-            }
-
-
-
+            } 
             else
                 curr_token.type = token_type_e::type_identifier;
             curr_token.value = word;
@@ -107,8 +96,54 @@ std::vector<token_t> tokenise(const std::string &contents) {
             curr_token.value = std::string(1, consume(contents, token_index));
         }
         else if (peek(contents, token_index) == '=') {
-            curr_token.type = token_type_e::type_equal;
-            curr_token.value = std::string(1, consume(contents, token_index));
+            // Check for ==
+            if (peek_ahead(contents, token_index, 1) == '=') {
+                curr_token.type = token_type_e::type_eq;
+                curr_token.value = "==";
+                consume(contents, token_index); // Consume first '='
+                consume(contents, token_index); // Consume second '='
+            } else {
+                curr_token.type = token_type_e::type_equal;
+                curr_token.value = std::string(1, consume(contents, token_index));
+            }
+        }
+        else if (peek(contents, token_index) == '!') {
+            // Check for !=
+            if (peek_ahead(contents, token_index, 1) == '=') {
+                curr_token.type = token_type_e::type_nq;
+                curr_token.value = "!=";
+                consume(contents, token_index); // Consume '!'
+                consume(contents, token_index); // Consume '='
+            } else {
+                error_msg("Invalid token: expected '=' after '!'");
+                consume(contents, token_index); // Consume '!'
+                continue;
+            }
+        }
+         else if (peek(contents, token_index) == '>') {
+            // Check for >=
+            if (peek_ahead(contents, token_index, 1) == '=') {
+                curr_token.type = token_type_e::type_ge;
+                curr_token.value = ">=";
+                consume(contents, token_index); // Consume '>'
+                consume(contents, token_index); // Consume '='
+            } else {
+                curr_token.type = token_type_e::type_gt; // greater than
+                curr_token.value = std::string(1, consume(contents, token_index));
+            }
+        }
+         else if (peek(contents, token_index) == '<') {
+            // Check for <=
+            if (peek_ahead(contents, token_index, 1) == '=') {
+                curr_token.type = token_type_e::type_le;
+                curr_token.value = "<=";
+                consume(contents, token_index); // Consume '<'
+                consume(contents, token_index); // Consume '='
+            } else {
+                curr_token.type = token_type_e::type_lt; // less than
+                curr_token.value = std::string(1, consume(contents, token_index));
+            }
+        
         }else if (peek(contents, token_index) == '{') {
             curr_token.type = token_type_e::type_open_squigly;
             curr_token.value = std::string(1, consume(contents, token_index));
