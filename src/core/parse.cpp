@@ -212,6 +212,29 @@ void parse_let_statement(std::vector<token_t>& tokens, size_t &token_index, ast_
     consume_token(tokens, token_index); // Consume the ';' token
 }
 
+void parse_comparison(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node) {
+    parse_expression(tokens, token_index, root_node);
+
+    const token_t* token = peek_token(tokens, token_index);
+    if (!token) return;
+
+    if (token->type == token_type_e::type_eq || 
+        token->type == token_type_e::type_nq || 
+        token->type == token_type_e::type_ge || 
+        token->type == token_type_e::type_le) {
+        
+        ast_node_t operator_node;
+        operator_node.type = token->type;
+        consume_token(tokens, token_index);
+
+        operator_node.child_node_1 = std::make_unique<ast_node_t>(std::move(root_node));
+        operator_node.child_node_2 = std::make_unique<ast_node_t>();
+
+        parse_expression(tokens, token_index, *operator_node.child_node_2);
+        root_node = std::move(operator_node);
+    }
+}
+
 void parse_if_statement(std::vector<token_t>& tokens, size_t &token_index, ast_node_t& root_node) {
     consume_token(tokens, token_index); // if token
     
@@ -224,7 +247,7 @@ void parse_if_statement(std::vector<token_t>& tokens, size_t &token_index, ast_n
     
     // Parse condition expression
     ast_node_t condition_node;
-    parse_expression(tokens, token_index, condition_node);
+    parse_comparison(tokens, token_index, condition_node);
     
     // Check for closing parenthesis
     const token_t* close_paren = peek_token(tokens, token_index);
