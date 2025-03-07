@@ -58,35 +58,43 @@ std::string token_type_to_string(token_type_e type) {
 
 
 // Parse factor (integers or parenthesized expressions)
-void parse_factor(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node) {
-    const token_t* token = peek_token(tokens, token_index);
+void parse_factor(std::vector<token_t>& tokens, size_t& token_index,
+                  ast_node_t& root_node) {
+  const token_t* token = peek_token(tokens, token_index);
 
-    if (!token || token->type == token_type_e::type_EOF) {
-        error_msg("Unexpected end of tokens while parsing factor.");
-        return;
-    }
+  if (!token || token->type == token_type_e::type_EOF) {
+    error_msg("Unexpected end of tokens while parsing factor.");
+    return;
+  }
 
-    if (token->type == token_type_e::type_int_lit) {
-        root_node.type = token->type;
-        root_node.int_value = stoi(token->value);
-        info_msg("Parsed integer literal: {}", root_node.int_value);
-        consume_token(tokens, token_index);
-    }
-    else if (token->type == token_type_e::type_open_paren) {
-        consume_token(tokens, token_index);
-        parse_expression(tokens, token_index, root_node);
+  if (token->type == token_type_e::type_int_lit) {
+    root_node.type = token->type;
+    root_node.int_value = stoi(token->value);
+    info_msg("Parsed integer literal: {}", root_node.int_value);
+    consume_token(tokens, token_index);
+  } else if (token->type == token_type_e::type_identifier) {
+    root_node.type = token->type;
+    root_node.string_value = token->value;
+    info_msg("Parsed identifier: {}", root_node.string_value);
+    consume_token(tokens, token_index);
+  } else if (token->type == token_type_e::type_open_paren) {
+    consume_token(tokens, token_index);
+    parse_expression(tokens, token_index, root_node);
 
-        token = peek_token(tokens, token_index);
-        if (!token || token->type != token_type_e::type_close_paren) {
-            error_msg("Expected ')', but didn't find it.");
-            return;
-        }
-        consume_token(tokens, token_index);
+    token = peek_token(tokens, token_index);
+    if (!token || token->type != token_type_e::type_close_paren) {
+      error_msg("Expected ')', but didn't find it.");
+      return;
     }
-    else {
-        error_msg("[ERROR]: Invalid factor, expected integer literal or '(' but found: {}", token_type_to_string(token->type));
-    }
+    consume_token(tokens, token_index);
+  } else {
+    error_msg(
+        "[ERROR]: Invalid factor, expected integer literal or '(' but found: "
+        "{}",
+        token_type_to_string(token->type));
+  }
 }
+
 
 // Parse multiplication and division operations
 void parse_term(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node) {
