@@ -93,6 +93,8 @@ void process_variable_declarations(std::vector<ast_node_t>& ast) {
     }
 }
 
+
+
 std::map<std::string, std::shared_ptr<ast_node_t>> function_table;
 void process_function_declarations(std::vector<ast_node_t> &ast) {
     info_msg("Processing function declarations...");
@@ -100,7 +102,7 @@ void process_function_declarations(std::vector<ast_node_t> &ast) {
         info_msg("Node type: {}", token_type_to_string(node.type));
         if (node.type == token_type_e::type_fn) {
             info_msg("Found function: {}", node.string_value);
-            function_table[node.string_value] = std::make_shared<ast_node_t>(std::move(node));
+            function_table[node.string_value] = std::shared_ptr<ast_node_t>(&node, [](ast_node_t*){});
         }
     }
     info_msg("Function table size: {}", function_table.size());
