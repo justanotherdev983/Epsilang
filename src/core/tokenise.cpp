@@ -1,5 +1,4 @@
 #include <string>
-#include <ostream>
 
 #include "core/tokenise.hpp"
 #include "utils/error.hpp"
@@ -62,6 +61,10 @@ std::vector<token_t> tokenise(const std::string &contents) {
             }
             else if (word == "else") {
                 curr_token.type = token_type_e::type_else;
+            } else if (word == "return") {
+                curr_token.type = token_type_e::type_return;
+            } else if (word == "fn") {
+                curr_token.type = token_type_e::type_fn;
             } 
             else
                 curr_token.type = token_type_e::type_identifier;
@@ -149,6 +152,9 @@ std::vector<token_t> tokenise(const std::string &contents) {
             curr_token.value = std::string(1, consume(contents, token_index));
         }else if (peek(contents, token_index) == '}') {
             curr_token.type = token_type_e::type_close_squigly;
+            curr_token.value = std::string(1, consume(contents, token_index));
+        } else if (peek(contents, token_index) == ',') {
+            curr_token.type = token_type_e::type_comma;
             curr_token.value = std::string(1, consume(contents, token_index));
         }
         else {

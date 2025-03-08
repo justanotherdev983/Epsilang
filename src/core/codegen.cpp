@@ -12,6 +12,50 @@
 std::map<std::string, std::string> symbol_table;
 int variable_count = 0;
 
+int get_stack_offset(const ast_node_t& func_node, const std::string& var_name) {
+    // Find parameter position
+    for (size_t i = 0; i < func_node.parameters.size(); i++) {
+        if (func_node.parameters[i] == var_name) {
+            // Parameters are at [rbp-8], [rbp-16], etc.
+            return -((i + 1) * 8);
+        }
+    }
+    
+    // Check local variables
+    auto it = func_node.local_symbols.find(var_name);
+    if (it != func_node.local_symbols.end()) {
+        // Local variables start after parameters
+        int offset = -(func_node.parameters.size() + std::stoi(it->second) + 1) * 8;
+        return offset;
+    }
+    
+    return 0; // Not found (will be a global variable)
+}
+
+// Modify how variables are accessed inside functions
+void access_variable(const ast_node_t& node, const ast_node_t* current_function, 
+                    std::ofstream& asm_file) {
+    std::string var_name = node.string_value;
+    
+    if (current_function) {
+        // Check if it's a local variable or parameter
+        int offset = get_stack_offset(*current_function, var_name);
+        if (offset != 0) {
+            // Local variable or parameter
+            asm_file << "    mov rdi, [rbp" << offset << "]" << std::endl;
+            return;
+        }
+    }
+    
+    // Global variable
+    if (symbol_table.count(var_name) > 0) {
+        std::string global_var_name = symbol_table[var_name];
+        asm_file << "    mov rdi, [" << global_var_name << "]" << std::endl;
+    } else {
+        error_msg("Undefined variable: {}", var_name);
+    }
+}
+
 void gen_binary_op(const ast_node_t& node, std::ofstream& asm_file) {
   gen_node_code(*node.child_node_1, asm_file);
   asm_file << "    push rdi" << std::endl;  // Save left operand on the stack
@@ -33,7 +77,7 @@ void gen_binary_op(const ast_node_t& node, std::ofstream& asm_file) {
     case token_type_e::type_div:
       asm_file << "    mov rax, rdi" << std::endl;
       asm_file << "    xor rdx, rdx" << std::endl;
-      asm_file << "    div rax" << std::endl;
+      asm_file << "    div rsi" << std::endl;
       asm_file << "    mov rdi, rax" << std::endl;
       break;
     default:
@@ -48,6 +92,115 @@ void process_variable_declarations(std::vector<ast_node_t>& ast) {
         process_node_declarations(node);
     }
 }
+
+std::map<std::string, std::shared_ptr<ast_node_t>> function_table;
+void process_function_declarations(std::vector<ast_node_t> &ast) {
+    info_msg("Processing function declarations...");
+    for (auto& node : ast) {
+        info_msg("Node type: {}", token_type_to_string(node.type));
+        if (node.type == token_type_e::type_fn) {
+            info_msg("Found function: {}", node.string_value);
+            function_table[node.string_value] = std::make_shared<ast_node_t>(std::move(node));
+        }
+    }
+    info_msg("Function table size: {}", function_table.size());
+}
+
+void gen_function_code(const ast_node_t& node, std::ofstream& asm_file) {
+    // Generate function label
+    std::string function_name = "func_" + node.string_value;
+    asm_file << function_name << ":" << std::endl;
+    
+    // Prologue
+    asm_file << "    push rbp" << std::endl;
+    asm_file << "    mov rbp, rsp" << std::endl;
+    
+    // Allocate space for local variables if needed
+    int local_vars_count = node.local_symbols.size();
+    if (local_vars_count > 0) {
+        asm_file << "    sub rsp, " << (local_vars_count * 8) << std::endl;
+    }
+    
+    // Store parameters in the stack
+    for (size_t i = 0; i < node.parameters.size(); i++) {
+        // Parameters are passed in registers: rdi, rsi, rdx, rcx, r8, r9
+        std::string reg;
+        switch(i) {
+            case 0: reg = "rdi"; break;
+            case 1: reg = "rsi"; break;
+            case 2: reg = "rdx"; break;
+            case 3: reg = "rcx"; break;
+            case 4: reg = "r8"; break;
+            case 5: reg = "r9"; break;
+            default:
+                error_msg("More than 6 parameters are not supported yet");
+                return;
+        }
+        
+        // Store parameter in its stack position
+        int offset = -(i + 1) * 8;
+        asm_file << "    mov [rbp" << offset << "], " << reg << std::endl;
+    }
+    
+    // Generate code for function body
+    for (const auto& stmt : node.body) {
+        gen_node_code(stmt, asm_file);
+    }
+    
+    // Epilogue
+    asm_file << "    mov rsp, rbp" << std::endl;
+    asm_file << "    pop rbp" << std::endl;
+    asm_file << "    ret" << std::endl;
+}
+
+void gen_function_call(const ast_node_t& node, std::ofstream& asm_file) {
+    // Save caller-saved registers
+    asm_file << "    push rdi" << std::endl;
+    asm_file << "    push rsi" << std::endl;
+    asm_file << "    push rdx" << std::endl;
+    asm_file << "    push rcx" << std::endl;
+    asm_file << "    push r8" << std::endl;
+    asm_file << "    push r9" << std::endl;
+    
+    // Generate code for arguments and move them to appropriate registers
+    for (size_t i = 0; i < node.arguments.size(); i++) {
+        gen_node_code(node.arguments[i], asm_file);
+        
+        // Move result from rdi to the appropriate register
+        std::string reg;
+        switch(i) {
+            case 0: reg = "rdi"; break; // First arg stays in rdi
+            case 1: reg = "rsi"; break;
+            case 2: reg = "rdx"; break;
+            case 3: reg = "rcx"; break;
+            case 4: reg = "r8"; break;
+            case 5: reg = "r9"; break;
+            default:
+                error_msg("More than 6 arguments are not supported yet");
+                return;
+        }
+        
+        if (i > 0) {
+            asm_file << "    mov " << reg << ", rdi" << std::endl;
+        }
+    }
+    
+    // Call the function
+    std::string function_name = "func_" + node.string_value;
+    asm_file << "    call " << function_name << std::endl;
+    
+    // Restore caller-saved registers (in reverse order)
+    asm_file << "    pop r9" << std::endl;
+    asm_file << "    pop r8" << std::endl;
+    asm_file << "    pop rcx" << std::endl;
+    asm_file << "    pop rdx" << std::endl;
+    asm_file << "    pop rsi" << std::endl;
+    asm_file << "    pop rdi" << std::endl;
+    
+    // Function result is in rax, move it to rdi
+    asm_file << "    mov rdi, rax" << std::endl;
+}
+
 
 // Process a single node recursively for variable declarations
 void process_node_declarations(ast_node_t& node) {
@@ -101,13 +254,12 @@ void process_node_declarations(ast_node_t& node) {
 void gen_code_for_ast(const std::vector<ast_node_t>& ast,
                       std::ofstream& asm_file) {
   asm_file << "format ELF64" << std::endl;
-
-  // Process variable declarations to populate the symbol table
+  
+  // Process variable and function declarations
   process_variable_declarations(const_cast<std::vector<ast_node_t>&>(ast));
+  process_function_declarations(const_cast<std::vector<ast_node_t>&>(ast));
 
   asm_file << "section '.data' writeable" << std::endl;
-
-  // Declare variables in the data section
   for (const auto& pair : symbol_table) {
     asm_file << "    " << pair.second << " dq 0" << std::endl;
     asm_file << "    " << pair.second << "_len = $ - " << pair.second
@@ -115,12 +267,21 @@ void gen_code_for_ast(const std::vector<ast_node_t>& ast,
   }
 
   asm_file << "section '.text' executable" << std::endl << std::endl;
+  
+  // Generate code for functions
+  for (const auto& pair : function_table) {
+    gen_function_code(*pair.second, asm_file);
+    asm_file << std::endl;
+  }
+  
+  // Generate main code
   asm_file << "public _start" << std::endl;
   asm_file << "_start:" << std::endl;
-
-  // Generate code for all nodes
   for (const auto& node : ast) {
-    gen_node_code(node, asm_file);
+    // Skip function definitions in the main code path
+    if (node.type != token_type_e::type_fn) {
+      gen_node_code(node, asm_file);
+    }
   }
 
   asm_file << "    syscall" << std::endl;
@@ -287,7 +448,24 @@ void gen_node_code(const ast_node_t& node, std::ofstream& asm_file) {
     case token_type_e::type_block:
       gen_block_code(node, asm_file);
       break;
-
+    case token_type_e::type_fn:
+      // Function definitions are handled separately
+      break;
+      
+    case token_type_e::type_call:
+      gen_function_call(node, asm_file);
+      break;
+    case token_type_e::type_return:
+            if (node.child_node_1) {
+                gen_node_code(*node.child_node_1, asm_file);
+                // Move the result from rdi to rax for return value
+                asm_file << "    mov rax, rdi" << std::endl;
+            }
+            // Generate function epilogue
+            asm_file << "    mov rsp, rbp" << std::endl;
+            asm_file << "    pop rbp" << std::endl;
+            asm_file << "    ret" << std::endl;
+            break;
     case token_type_e::type_semi:
       info_msg("Encountered semi token, writing to output asm file");
       asm_file << "    ; Semicolon encountered" << std::endl;

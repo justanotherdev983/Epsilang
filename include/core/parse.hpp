@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <memory>
-
+#include <map>
 
 #include "core/tokenise.hpp"
 
@@ -16,6 +16,10 @@ struct ast_node_t
     std::unique_ptr<ast_node_t> child_node_3;
 
     std::vector<ast_node_t> statements;
+    std::vector<std::string> parameters;
+    std::vector<ast_node_t> arguments;
+    std::vector<ast_node_t> body;
+    std::map<std::string, std::string> local_symbols;
 };
 
 std::string token_type_to_string(token_type_e type);
