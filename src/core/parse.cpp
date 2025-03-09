@@ -67,6 +67,79 @@ std::string token_type_to_string(token_type_e type) {
     }
 }
 
+void parse_block(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node) {
+    std::vector<ast_node_t> block_statements;
+   
+    while (true) {
+        const token_t* token = peek_token(tokens, token_index);
+        if (!token) {
+            error_msg("Unexpected end of file in block");
+            break;
+        }
+       
+        if (token->type == token_type_e::type_close_squigly) {
+            consume_token(tokens, token_index); // Consume '}'
+            break;
+        }
+       
+        // Parse a statement and add it to the block
+        ast_node_t statement;
+        if (token->type == token_type_e::type_let) {
+            parse_let_statement(tokens, token_index, statement);
+        }
+        else if (token->type == token_type_e::type_if) {
+            parse_if_statement(tokens, token_index, statement);
+        }
+        else if (token->type == token_type_e::type_exit) {
+            parse_exit_statement(tokens, token_index, statement);
+        }
+        else if (token->type == token_type_e::type_return) {
+            parse_return_statement(tokens, token_index, statement);
+        }
+        else if (token->type == token_type_e::type_int_lit ||
+                 token->type == token_type_e::type_identifier ||
+                 token->type == token_type_e::type_open_paren) {
+            parse_expression(tokens, token_index, statement);
+           
+            // Look for semicolon
+            token = peek_token(tokens, token_index);
+            if (token && token->type == token_type_e::type_semi) {
+                consume_token(tokens, token_index);
+            } else {
+                error_msg("Expected ';' after expression in block, but found: {}",
+                         token ? token_type_to_string(token->type) : "EOF");
+                // Try to recover by skipping to next semicolon or closing brace
+                while (token && token->type != token_type_e::type_semi &&
+                       token->type != token_type_e::type_close_squigly) {
+                    consume_token(tokens, token_index);
+                    token = peek_token(tokens, token_index);
+                }
+                if (token && token->type == token_type_e::type_semi) {
+                    consume_token(tokens, token_index);
+                }
+                continue;
+            }
+        }
+        else {
+            error_msg("Unexpected token in block: {}", token_type_to_string(token->type));
+            // Skip to next statement
+            while (token && token->type != token_type_e::type_semi &&
+                   token->type != token_type_e::type_close_squigly) {
+                consume_token(tokens, token_index);
+                token = peek_token(tokens, token_index);
+            }
+            if (token && token->type == token_type_e::type_semi) {
+                consume_token(tokens, token_index);
+            }
+            continue;
+        }
+       
+        block_statements.push_back(std::move(statement));
+    }
+   
+    // Store the statements in the root node
+    root_node.statements = std::move(block_statements);
+}
 
 
 // Parse factor (integers or parenthesized expressions)
@@ -295,74 +368,12 @@ void parse_function_statement(std::vector<token_t>& tokens, size_t& token_index,
     }
     consume_token(tokens, token_index);
 
-    std::vector<ast_node_t> body_statements;
+    ast_node_t body_node;
+    body_node.type = token_type_e::type_block;
     
-    while (true) {
-        const token_t* token = peek_token(tokens, token_index);
-        if (!token) {
-            error_msg("Unexpected end of file in function body");
-            return;
-        }
-        
-        if (token->type == token_type_e::type_close_squigly) {
-            consume_token(tokens, token_index);
-            break;
-        }
-        
-        ast_node_t statement;
-        if (token->type == token_type_e::type_let) {
-            parse_let_statement(tokens, token_index, statement);
-        } 
-        else if (token->type == token_type_e::type_if) {
-            parse_if_statement(tokens, token_index, statement);
-        }
-        else if (token->type == token_type_e::type_exit) {
-            parse_exit_statement(tokens, token_index, statement);
-        }
-        else if (token->type == token_type_e::type_return) {
-            parse_return_statement(tokens, token_index, statement);
-        }
-        else if (token->type == token_type_e::type_int_lit || 
-                 token->type == token_type_e::type_identifier || 
-                 token->type == token_type_e::type_open_paren) {
-            parse_expression(tokens, token_index, statement);
-            
-            token = peek_token(tokens, token_index);
-            if (token && token->type == token_type_e::type_semi) {
-                consume_token(tokens, token_index);
-            } else {
-                error_msg("Expected ';' after expression in function body, but found: {}", 
-                         token ? token_type_to_string(token->type) : "EOF");
-                // Attempt to recover from error by skipping to next semicolon
-                while (token && token->type != token_type_e::type_semi && 
-                       token->type != token_type_e::type_close_squigly) {
-                    consume_token(tokens, token_index);
-                    token = peek_token(tokens, token_index);
-                }
-                if (token && token->type == token_type_e::type_semi) {
-                    consume_token(tokens, token_index);
-                }
-                continue;
-            }
-        }
-        else {
-            error_msg("Unexpected token in function body: {}", token_type_to_string(token->type));
-            // Attempt to recover from error by skipping to next semicolon or closing brace
-            while (token && token->type != token_type_e::type_semi && 
-                   token->type != token_type_e::type_close_squigly) {
-                consume_token(tokens, token_index);
-                token = peek_token(tokens, token_index);
-            }
-            if (token && token->type == token_type_e::type_semi) {
-                consume_token(tokens, token_index);
-            }
-            continue;
-        }
-        
-        body_statements.push_back(std::move(statement));
-    }
-
-    root_node.body = std::move(body_statements);
+    parse_block(tokens, token_index, body_node);
+    
+    root_node.body = std::move(body_node.statements);
 }
 
 void parse_exit_statement(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node) {
@@ -466,122 +477,51 @@ void parse_comparison(std::vector<token_t>& tokens, size_t& token_index, ast_nod
 
 void parse_if_statement(std::vector<token_t>& tokens, size_t &token_index, ast_node_t& root_node) {
     consume_token(tokens, token_index); // if token
-    
+   
     const token_t* open_paren = peek_token(tokens, token_index);
     if (!open_paren || open_paren->type != token_type_e::type_open_paren) {
-        error_msg("Expected '(' after if statement, but found: {}", 
+        error_msg("Expected '(' after if statement, but found: {}",
                  open_paren ? token_type_to_string(open_paren->type) : "EOF");
         return;
     }
     consume_token(tokens, token_index); // Consume '('
-    
+   
     // Parse condition expression
     ast_node_t condition_node;
     parse_comparison(tokens, token_index, condition_node);
-    
+   
     // Check for closing parenthesis
     const token_t* close_paren = peek_token(tokens, token_index);
     if (!close_paren || close_paren->type != token_type_e::type_close_paren) {
-        error_msg("Expected ')' after if condition, but found: {}", 
+        error_msg("Expected ')' after if condition, but found: {}",
                  close_paren ? token_type_to_string(close_paren->type) : "EOF");
         return;
     }
     consume_token(tokens, token_index); // Consume ')'
-    
+   
     // Check for opening brace
     const token_t* open_squigly = peek_token(tokens, token_index);
     if (!open_squigly || open_squigly->type != token_type_e::type_open_squigly) {
-        error_msg("Expected '{' after if condition, but found: {}", 
+        error_msg("Expected '{' after if condition, but found: {}",
                  open_squigly ? token_type_to_string(open_squigly->type) : "EOF");
         return;
     }
     consume_token(tokens, token_index); // Consume '{'
-    
+   
     // Parse the then branch (statements inside the if block)
     ast_node_t then_branch;
     then_branch.type = token_type_e::type_block;
-    std::vector<ast_node_t> then_statements;
-    
-    // Parse statements until we hit the closing brace
-    while (true) {
-        const token_t* token = peek_token(tokens, token_index);
-        if (!token) {
-            error_msg("Unexpected end of file in if block");
-            break;
-        }
-        
-        if (token->type == token_type_e::type_close_squigly) {
-            consume_token(tokens, token_index); // Consume '}'
-            break;
-        }
-        
-        // Parse a statement and add it to the block
-        ast_node_t statement;
-        if (token->type == token_type_e::type_let) {
-            parse_let_statement(tokens, token_index, statement);
-        } 
-        else if (token->type == token_type_e::type_if) {
-            parse_if_statement(tokens, token_index, statement);
-        }
-        else if (token->type == token_type_e::type_exit) {
-            parse_exit_statement(tokens, token_index, statement);
-        }
-        else if (token->type == token_type_e::type_return) {
-            parse_return_statement(tokens, token_index, statement);
-        }
-        else if (token->type == token_type_e::type_int_lit || 
-                 token->type == token_type_e::type_identifier || 
-                 token->type == token_type_e::type_open_paren) {
-            parse_expression(tokens, token_index, statement);
-            
-            // Look for semicolon
-            token = peek_token(tokens, token_index);
-            if (token && token->type == token_type_e::type_semi) {
-                consume_token(tokens, token_index);
-            } else {
-                error_msg("Expected ';' after expression in if block, but found: {}", 
-                         token ? token_type_to_string(token->type) : "EOF");
-                // Try to recover by skipping to next semicolon or closing brace
-                while (token && token->type != token_type_e::type_semi && 
-                       token->type != token_type_e::type_close_squigly) {
-                    consume_token(tokens, token_index);
-                    token = peek_token(tokens, token_index);
-                }
-                if (token && token->type == token_type_e::type_semi) {
-                    consume_token(tokens, token_index);
-                }
-                continue;
-            }
-        }
-        else {
-            error_msg("Unexpected token in if block: {}", token_type_to_string(token->type));
-            // Skip to next statement
-            while (token && token->type != token_type_e::type_semi && 
-                   token->type != token_type_e::type_close_squigly) {
-                consume_token(tokens, token_index);
-                token = peek_token(tokens, token_index);
-            }
-            if (token && token->type == token_type_e::type_semi) {
-                consume_token(tokens, token_index);
-            }
-            continue;
-        }
-        
-        then_statements.push_back(std::move(statement));
-    }
-    
-    // Store the statements in the then branch
-    then_branch.statements = std::move(then_statements);
-    
+    parse_block(tokens, token_index, then_branch);
+   
     // Check for else branch
     const token_t* else_token = peek_token(tokens, token_index);
     ast_node_t else_branch;
     bool has_else = false;
-    
+   
     if (else_token && else_token->type == token_type_e::type_else) {
         consume_token(tokens, token_index); // Consume 'else'
         has_else = true;
-        
+       
         // Check if it's an else-if
         const token_t* next_token = peek_token(tokens, token_index);
         if (next_token && next_token->type == token_type_e::type_if) {
@@ -591,93 +531,24 @@ void parse_if_statement(std::vector<token_t>& tokens, size_t &token_index, ast_n
             // Parse the else block
             const token_t* else_open_squigly = peek_token(tokens, token_index);
             if (!else_open_squigly || else_open_squigly->type != token_type_e::type_open_squigly) {
-                error_msg("Expected '{' after else, but found: {}", 
+                error_msg("Expected '{' after else, but found: {}",
                          else_open_squigly ? token_type_to_string(else_open_squigly->type) : "EOF");
                 return;
             }
             consume_token(tokens, token_index); // Consume '{'
-            
+           
             else_branch.type = token_type_e::type_block;
-            std::vector<ast_node_t> else_statements;
             
             // Parse statements until we hit the closing brace
-            while (true) {
-                const token_t* token = peek_token(tokens, token_index);
-                if (!token) {
-                    error_msg("Unexpected end of file in else block");
-                    break;
-                }
-                
-                if (token->type == token_type_e::type_close_squigly) {
-                    consume_token(tokens, token_index); // Consume '}'
-                    break;
-                }
-                
-                // Parse a statement and add it to the block
-                ast_node_t statement;
-                if (token->type == token_type_e::type_let) {
-                    parse_let_statement(tokens, token_index, statement);
-                } 
-                else if (token->type == token_type_e::type_if) {
-                    parse_if_statement(tokens, token_index, statement);
-                }
-                else if (token->type == token_type_e::type_exit) {
-                    parse_exit_statement(tokens, token_index, statement);
-                }
-                else if (token->type == token_type_e::type_return) {
-                    parse_return_statement(tokens, token_index, statement);
-                }
-                else if (token->type == token_type_e::type_int_lit || 
-                         token->type == token_type_e::type_identifier || 
-                         token->type == token_type_e::type_open_paren) {
-                    parse_expression(tokens, token_index, statement);
-                    
-                    // Look for semicolon
-                    token = peek_token(tokens, token_index);
-                    if (token && token->type == token_type_e::type_semi) {
-                        consume_token(tokens, token_index);
-                    } else {
-                        error_msg("Expected ';' after expression in else block, but found: {}", 
-                                 token ? token_type_to_string(token->type) : "EOF");
-                        // Try to recover
-                        while (token && token->type != token_type_e::type_semi && 
-                               token->type != token_type_e::type_close_squigly) {
-                            consume_token(tokens, token_index);
-                            token = peek_token(tokens, token_index);
-                        }
-                        if (token && token->type == token_type_e::type_semi) {
-                            consume_token(tokens, token_index);
-                        }
-                        continue;
-                    }
-                }
-                else {
-                    error_msg("Unexpected token in else block: {}", token_type_to_string(token->type));
-                    // Skip to next statement
-                    while (token && token->type != token_type_e::type_semi && 
-                           token->type != token_type_e::type_close_squigly) {
-                        consume_token(tokens, token_index);
-                        token = peek_token(tokens, token_index);
-                    }
-                    if (token && token->type == token_type_e::type_semi) {
-                        consume_token(tokens, token_index);
-                    }
-                    continue;
-                }
-                
-                else_statements.push_back(std::move(statement));
-            }
-            
-            // Store the statements in the else branch
-            else_branch.statements = std::move(else_statements);
+            parse_block(tokens, token_index, else_branch);
         }
     }
-    
+   
     // Create the if node with condition, then branch, and optional else branch
     root_node.type = token_type_e::type_if;
     root_node.child_node_1 = std::make_unique<ast_node_t>(std::move(condition_node)); // Condition
     root_node.child_node_2 = std::make_unique<ast_node_t>(std::move(then_branch));    // Then branch
-    
+   
     if (has_else) {
         root_node.child_node_3 = std::make_unique<ast_node_t>(std::move(else_branch)); // Else branch
     }

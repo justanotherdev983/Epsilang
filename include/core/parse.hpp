@@ -35,5 +35,7 @@ void parse_comparison(std::vector<token_t>& tokens, size_t& token_index, ast_nod
 void parse_exit_statement(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node);
 void parse_let_statement(std::vector<token_t>& token_stream, size_t &token_index, ast_node_t& root_node);
 void parse_if_statement(std::vector<token_t>& token_stream, size_t &token_index, ast_node_t& root_node);
+void parse_return_statement(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node);
+void parse_function_statement(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node);
 
 std::vector<ast_node_t> parse_statement(std::vector<token_t>& token_stream);
