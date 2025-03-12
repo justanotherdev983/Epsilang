@@ -545,18 +545,15 @@ void gen_block_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
         gen_if_code(node, ctx);
     }
 }
-
 void gen_node_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
     switch (node.type) {
         case token_type_e::type_exit:
             info_msg("Encountered exit token, writing to output asm file");
-
             if (node.child_node_1) {
                 gen_node_code(*node.child_node_1, ctx);
             }
             ctx.asm_file << "    mov rax, 60; exit syscall" << std::endl;
             break;
-
         case token_type_e::type_int_lit:
             // Only emit if not part of an expression
             if (!node.child_node_1 && !node.child_node_2) {
@@ -566,6 +563,13 @@ void gen_node_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
             break;
         case token_type_e::type_let:
             push_var_on_stack(node, ctx);
+            break;
+        case token_type_e::type_identifier:
+            // Use the context's access_variable method
+            ctx.access_variable(node.string_value);
+            break;
+        case token_type_e::type_assignment:
+            // Assignment is handled by the let statement
             break;
         case token_type_e::type_add:
         case token_type_e::type_sub:
@@ -587,22 +591,48 @@ void gen_node_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
             {
                 std::string label_true = ctx.generate_label("comp_true");
                 std::string label_end = ctx.generate_label("comp_end");
-                
+               
                 gen_comparison(node, ctx, label_true, label_end);
-                
+               
                 // If we reach here, comparison was false
                 ctx.asm_file << "    mov rdi, 0" << std::endl;
                 ctx.asm_file << "    jmp " << label_end << std::endl;
-                
+               
                 // If comparison was true
                 ctx.asm_file << label_true << ":" << std::endl;
                 ctx.asm_file << "    mov rdi, 1" << std::endl;
-                
+               
                 ctx.asm_file << label_end << ":" << std::endl;
             }
             break;
+        case token_type_e::type_open_paren:
+            info_msg("Encountered open_paren token in codegen");
+            // Usually handled by expression parsing, but add handling here for standalone
+            if (node.child_node_1) {
+                gen_node_code(*node.child_node_1, ctx);
+            }
+            break;
+        case token_type_e::type_close_paren:
+            info_msg("Encountered close_paren token in codegen");
+            // Usually handled by expression parsing, but add handling here for standalone
+            break;
+        case token_type_e::type_open_squigly:
+            info_msg("Encountered open_squigly token in codegen");
+            // Usually marks the beginning of a block, handled elsewhere
+            break;
+        case token_type_e::type_close_squigly:
+            info_msg("Encountered close_squigly token in codegen");
+            // Usually marks the end of a block, handled elsewhere
+            break;
         case token_type_e::type_if:
             gen_if_code(node, ctx);
+            break;
+        case token_type_e::type_else:
+            info_msg("Encountered else token in codegen");
+            // Normally handled as part of if-else construction in gen_if_code
+            if (node.child_node_1) {
+                gen_node_code(*node.child_node_1, ctx);
+            }
             break;
         case token_type_e::type_while:
             gen_while_code(node, ctx);
@@ -612,10 +642,20 @@ void gen_node_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
             break;
         case token_type_e::type_fn:
             // Function definitions are handled separately
+            info_msg("Function definition encountered in gen_node_code");
             break;
-            
         case token_type_e::type_call:
             gen_function_call(node, ctx);
+            break;
+        case token_type_e::type_comma:
+            info_msg("Encountered comma token in codegen");
+            // Usually handled in function calls or parameter lists
+            if (node.child_node_1) {
+                gen_node_code(*node.child_node_1, ctx);
+            }
+            if (node.child_node_2) {
+                gen_node_code(*node.child_node_2, ctx);
+            }
             break;
         case token_type_e::type_return:
             if (node.child_node_1) {
@@ -632,17 +672,12 @@ void gen_node_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
             info_msg("Encountered semi token, writing to output asm file");
             ctx.asm_file << "    ; Semicolon encountered" << std::endl;
             break;
-            
-        case token_type_e::type_identifier:
-            // Use the context's access_variable method
-            ctx.access_variable(node.string_value);
-            break;
-
         case token_type_e::type_space:
-        case token_type_e::type_EOF:
-            info_msg("Encountered space/EOF token, writing to output asm file");
+            info_msg("Encountered space token, no code generation needed");
             break;
-
+        case token_type_e::type_EOF:
+            info_msg("Encountered EOF token, finishing code generation");
+            break;
         default:
             error_msg("Encountered unknown token type in codegen");
     }
