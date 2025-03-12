@@ -2,6 +2,7 @@
 #include <map>
 
 #include "core/codegen.hpp"
+#include "core/parse.hpp"
 #include "core/tokenise.hpp"
 #include "utils/error.hpp"
 
@@ -16,28 +17,30 @@ std::string code_gen_ctx_t::generate_label(const std::string& base_name) {
 
 void code_gen_ctx_t::access_variable(const std::string& var_name) {
     if (current_function) {
-      // Check if it's a parameter
-      for (size_t i = 0; i < current_function->parameters.size(); ++i) {
-          if (current_function->parameters[i] == var_name) {
-              int offset = -((i + 1) * 8);
-              asm_file << "    mov rdi, [rbp" << offset << "]" << std::endl;
-              return;
-          }
-      }
+        // Check if it's a parameter
+        for (size_t i = 0; i < current_function->parameters.size(); ++i) {
+            if (current_function->parameters[i] == var_name) {
+                int offset = -((i + 1) * 8);
+                asm_file << "    mov rdi, [rbp" << offset << "]" << std::endl;
+                asm_file << "    ; Accessing parameter '" << var_name << "'" << std::endl;
+                return;
+            }
+        }
 
-      // Check if it's a local variable
-      auto it = current_function->local_symbols.find(var_name);
-      if (it != current_function->local_symbols.end()) {
-          int offset = -(current_function->parameters.size() + std::stoi(it->second) + 1) * 8;
-          asm_file << "    mov rdi, [rbp" << offset << "]" << std::endl;
-          return;
-      }
+        // Check if it's a local variable
+        auto it = current_function->local_symbols.find(var_name);
+        if (it != current_function->local_symbols.end()) {
+            int offset = -(current_function->parameters.size() + std::stoi(it->second) + 1) * 8;
+            asm_file << "    mov rdi, [rbp" << offset << "]" << std::endl;
+            asm_file << "    ; Accessing local variable '" << var_name << "'" << std::endl;
+            return;
+        }
     }
-
     
-    // If not local or parameter, assume global
+    // If not local or parameter, check global
     if (symbol_table.count(var_name) > 0) {
         asm_file << "    mov rdi, [" << symbol_table[var_name] << "]" << std::endl;
+        asm_file << "    ; Accessing global variable '" << var_name << "'" << std::endl;
     } else {
         error_msg("Undefined variable: {}", var_name);
     }
@@ -105,6 +108,33 @@ void process_function_declarations(std::vector<ast_node_t> &ast, code_gen_ctx_t&
             ctx.function_table[node.string_value] = &node;
         }
     }
+}
+
+void gen_while_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
+    std::string label_start = ctx.generate_label("while_start");
+    std::string label_body = ctx.generate_label("while_body");
+    std::string label_end = ctx.generate_label("while_end");
+   
+    // Start of the loop
+    ctx.asm_file << label_start << ":" << std::endl;
+   
+    // Generate condition code
+    gen_comparison(*node.child_node_1, ctx, label_body, label_end);
+   
+    // Loop body - DON'T emit the label again, it was already emitted by gen_comparison
+    // ctx.asm_file << label_body << ":" << std::endl;  // REMOVE THIS LINE
+    
+    if (node.child_node_2 && node.child_node_2->type == token_type_e::type_block) {
+        for (const auto& stmt : node.child_node_2->statements) {
+            gen_node_code(stmt, ctx);
+        }
+    }
+   
+    // Jump back to condition
+    ctx.asm_file << "    jmp " << label_start << std::endl;
+   
+    // Exit point of the loop
+    ctx.asm_file << label_end << ":" << std::endl;
 }
 
 void gen_function_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
@@ -214,12 +244,74 @@ void gen_function_call(const ast_node_t& node, code_gen_ctx_t& ctx) {
 
 // Process a single node recursively for variable declarations
 void process_node_declarations(ast_node_t& node, code_gen_ctx_t& ctx) {
-    if (node.type == token_type_e::type_let && node.child_node_1 &&
-            node.child_node_1->type == token_type_e::type_identifier) {
+    if (node.type == token_type_e::type_fn) {
+        // Process function declaration
+        // Note: We don't add function parameters to the global symbol table
+        
+        // Process the function body for local variables
+        if (node.body.size() > 0) {
+            // Save current function context
+            ast_node_t* previous_function = ctx.current_function;
+            ctx.current_function = &node;
+            
+            int local_var_index = 0;
+            
+            // Process each statement in the function body
+            for (auto& stmt : node.body) {
+                // Check for local variable declarations specifically
+                if (stmt.type == token_type_e::type_let && 
+                    stmt.child_node_1 && 
+                    stmt.child_node_1->type == token_type_e::type_identifier) {
+                    
+                    std::string var_name = stmt.child_node_1->string_value;
+                    
+                    // Add to the function's local symbol table with an index
+                    node.local_symbols[var_name] = std::to_string(local_var_index++);
+                    info_msg("Added local variable '{}' at index {} to function '{}'", 
+                             var_name, local_var_index-1, node.string_value);
+                }
+                
+                // Continue processing other nodes in the statement
+                process_node_declarations(stmt, ctx);
+            }
+            
+            // Restore previous function context
+            ctx.current_function = previous_function;
+        }
+    }
+    else if (node.type == token_type_e::type_let && 
+             node.child_node_1 && 
+             node.child_node_1->type == token_type_e::type_identifier) {
+        
         std::string identifier = node.child_node_1->string_value;
-        std::string var_name = "var_" + identifier;
-        ctx.symbol_table[identifier] = var_name;
-    } else if (node.type == token_type_e::type_if) {
+        
+        // Check if we're inside a function
+        if (ctx.current_function) {
+            // Skip if it's already a parameter or local variable
+            bool is_parameter = false;
+            for (const auto& param : ctx.current_function->parameters) {
+                if (param == identifier) {
+                    is_parameter = true;
+                    break;
+                }
+            }
+            
+            if (!is_parameter && ctx.current_function->local_symbols.find(identifier) == ctx.current_function->local_symbols.end()) {
+                // Add to the function's local symbol table with an index
+                int local_var_index = ctx.current_function->local_symbols.size();
+                ctx.current_function->local_symbols[identifier] = std::to_string(local_var_index);
+                info_msg("Added local variable '{}' at index {} to function '{}'", 
+                         identifier, local_var_index, ctx.current_function->string_value);
+            }
+        } 
+        else {
+            // Global variable
+            std::string var_name = "var_" + identifier;
+            ctx.symbol_table[identifier] = var_name;
+            info_msg("Added global variable '{}'", identifier);
+        }
+    } 
+    else if (node.type == token_type_e::type_if) {
         // Process the condition
         if (node.child_node_1) {
             process_node_declarations(*node.child_node_1, ctx);
@@ -242,7 +334,8 @@ void process_node_declarations(ast_node_t& node, code_gen_ctx_t& ctx) {
                 process_node_declarations(*node.child_node_3, ctx);
             }
         }
-    } else if (node.type == token_type_e::type_block) {
+    } 
+    else if (node.type == token_type_e::type_block) {
         // Process all statements in a block
         for (auto& stmt : node.statements) {
             process_node_declarations(stmt, ctx);
@@ -304,14 +397,14 @@ void gen_comparison(const ast_node_t& node, code_gen_ctx_t& ctx, const std::stri
     // Generate code for left operand
     gen_node_code(*node.child_node_1, ctx);
     ctx.asm_file << "    push rdi" << std::endl;  // Save left operand
-    
+   
     // Generate code for right operand
     gen_node_code(*node.child_node_2, ctx);
     ctx.asm_file << "    pop rax" << std::endl;   // Restore left operand
-    
+   
     // Compare the values
     ctx.asm_file << "    cmp rax, rdi" << std::endl;
-    
+   
     // Perform the appropriate jump based on the comparison type
     switch (node.type) {
         case token_type_e::type_eq:  // Equal
@@ -326,14 +419,20 @@ void gen_comparison(const ast_node_t& node, code_gen_ctx_t& ctx, const std::stri
         case token_type_e::type_le:  // Less or equal
             ctx.asm_file << "    jle " << label_true << std::endl;
             break;
+        case token_type_e::type_lt:  // Less than
+            ctx.asm_file << "    jl " << label_true << std::endl;
+            break;
+        case token_type_e::type_gt:  // Greater than
+            ctx.asm_file << "    jg " << label_true << std::endl;
+            break;
         default:
             ctx.asm_file << "    ; unknown comparison operator" << std::endl;
             break;
     }
-    
+   
     // Jump to end if condition is false
     ctx.asm_file << "    jmp " << label_end << std::endl;
-    
+   
     // Label for true condition
     ctx.asm_file << label_true << ":" << std::endl;
 }
@@ -382,21 +481,49 @@ void push_var_on_stack(const ast_node_t& node, code_gen_ctx_t& ctx) {
                 node.child_node_1->type == token_type_e::type_identifier) {
                 std::string identifier = node.child_node_1->string_value;
 
-                // Check if the identifier exists in the symbol table
-                if (ctx.symbol_table.count(identifier) > 0) {
-                    std::string var_name = ctx.symbol_table[identifier];
-
-                    // Generate code for the expression (will put result in rdi)
-                    if (node.child_node_2) {
-                        gen_node_code(*node.child_node_2, ctx);
-
-                        // Store the result in the named location
-                        ctx.asm_file << "    mov [" << var_name << "], rdi" << std::endl;
-                        ctx.asm_file << "    ; Variable '" << identifier
-                                    << "' assigned value in rdi" << std::endl;
+                // Generate code for the expression (will put result in rdi)
+                if (node.child_node_2) {
+                    gen_node_code(*node.child_node_2, ctx);
+                    
+                    // Check if we're inside a function context
+                    if (ctx.current_function) {
+                        // Check if it's a parameter
+                        bool is_parameter = false;
+                        for (size_t i = 0; i < ctx.current_function->parameters.size(); ++i) {
+                            if (ctx.current_function->parameters[i] == identifier) {
+                                int offset = -((i + 1) * 8);
+                                ctx.asm_file << "    mov [rbp" << offset << "], rdi" << std::endl;
+                                ctx.asm_file << "    ; Parameter '" << identifier 
+                                           << "' assigned value in rdi" << std::endl;
+                                is_parameter = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!is_parameter) {
+                            // Check if it's a local variable
+                            auto it = ctx.current_function->local_symbols.find(identifier);
+                            if (it != ctx.current_function->local_symbols.end()) {
+                                int offset = -(ctx.current_function->parameters.size() + 
+                                             std::stoi(it->second) + 1) * 8;
+                                ctx.asm_file << "    mov [rbp" << offset << "], rdi" << std::endl;
+                                ctx.asm_file << "    ; Local variable '" << identifier 
+                                           << "' assigned value in rdi" << std::endl;
+                            } else {
+                                error_msg("Variable not found in local scope: {}", identifier);
+                            }
+                        }
+                    } else {
+                        // Handle global variables
+                        if (ctx.symbol_table.count(identifier) > 0) {
+                            std::string var_name = ctx.symbol_table[identifier];
+                            ctx.asm_file << "    mov [" << var_name << "], rdi" << std::endl;
+                            ctx.asm_file << "    ; Global variable '" << identifier
+                                       << "' assigned value in rdi" << std::endl;
+                        } else {
+                            error_msg("Global variable not declared: {}", identifier);
+                        }
                     }
-                } else {
-                    error_msg("Variable {}'", identifier, "' not declared");
                 }
             } else {
                 error_msg("Invalid variable declaration: missing identifier");
@@ -418,18 +545,15 @@ void gen_block_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
         gen_if_code(node, ctx);
     }
 }
-
 void gen_node_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
     switch (node.type) {
         case token_type_e::type_exit:
             info_msg("Encountered exit token, writing to output asm file");
-
             if (node.child_node_1) {
                 gen_node_code(*node.child_node_1, ctx);
             }
             ctx.asm_file << "    mov rax, 60; exit syscall" << std::endl;
             break;
-
         case token_type_e::type_int_lit:
             // Only emit if not part of an expression
             if (!node.child_node_1 && !node.child_node_2) {
@@ -439,6 +563,13 @@ void gen_node_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
             break;
         case token_type_e::type_let:
             push_var_on_stack(node, ctx);
+            break;
+        case token_type_e::type_identifier:
+            // Use the context's access_variable method
+            ctx.access_variable(node.string_value);
+            break;
+        case token_type_e::type_assignment:
+            // Assignment is handled by the let statement
             break;
         case token_type_e::type_add:
         case token_type_e::type_sub:
@@ -450,20 +581,81 @@ void gen_node_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
             }
             gen_binary_op(node, ctx);
             break;
-            
+        case token_type_e::type_eq:
+        case token_type_e::type_nq:
+        case token_type_e::type_ge:
+        case token_type_e::type_le:
+        case token_type_e::type_lt:
+        case token_type_e::type_gt:
+            // Handle comparison operators
+            {
+                std::string label_true = ctx.generate_label("comp_true");
+                std::string label_end = ctx.generate_label("comp_end");
+               
+                gen_comparison(node, ctx, label_true, label_end);
+               
+                // If we reach here, comparison was false
+                ctx.asm_file << "    mov rdi, 0" << std::endl;
+                ctx.asm_file << "    jmp " << label_end << std::endl;
+               
+                // If comparison was true
+                ctx.asm_file << label_true << ":" << std::endl;
+                ctx.asm_file << "    mov rdi, 1" << std::endl;
+               
+                ctx.asm_file << label_end << ":" << std::endl;
+            }
+            break;
+        case token_type_e::type_open_paren:
+            info_msg("Encountered open_paren token in codegen");
+            // Usually handled by expression parsing, but add handling here for standalone
+            if (node.child_node_1) {
+                gen_node_code(*node.child_node_1, ctx);
+            }
+            break;
+        case token_type_e::type_close_paren:
+            info_msg("Encountered close_paren token in codegen");
+            // Usually handled by expression parsing, but add handling here for standalone
+            break;
+        case token_type_e::type_open_squigly:
+            info_msg("Encountered open_squigly token in codegen");
+            // Usually marks the beginning of a block, handled elsewhere
+            break;
+        case token_type_e::type_close_squigly:
+            info_msg("Encountered close_squigly token in codegen");
+            // Usually marks the end of a block, handled elsewhere
+            break;
         case token_type_e::type_if:
             gen_if_code(node, ctx);
             break;
-
+        case token_type_e::type_else:
+            info_msg("Encountered else token in codegen");
+            // Normally handled as part of if-else construction in gen_if_code
+            if (node.child_node_1) {
+                gen_node_code(*node.child_node_1, ctx);
+            }
+            break;
+        case token_type_e::type_while:
+            gen_while_code(node, ctx);
+            break;
         case token_type_e::type_block:
             gen_block_code(node, ctx);
             break;
         case token_type_e::type_fn:
             // Function definitions are handled separately
+            info_msg("Function definition encountered in gen_node_code");
             break;
-            
         case token_type_e::type_call:
             gen_function_call(node, ctx);
+            break;
+        case token_type_e::type_comma:
+            info_msg("Encountered comma token in codegen");
+            // Usually handled in function calls or parameter lists
+            if (node.child_node_1) {
+                gen_node_code(*node.child_node_1, ctx);
+            }
+            if (node.child_node_2) {
+                gen_node_code(*node.child_node_2, ctx);
+            }
             break;
         case token_type_e::type_return:
             if (node.child_node_1) {
@@ -480,17 +672,12 @@ void gen_node_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
             info_msg("Encountered semi token, writing to output asm file");
             ctx.asm_file << "    ; Semicolon encountered" << std::endl;
             break;
-            
-        case token_type_e::type_identifier:
-            // Use the context's access_variable method
-            ctx.access_variable(node.string_value);
-            break;
-
         case token_type_e::type_space:
-        case token_type_e::type_EOF:
-            info_msg("Encountered space/EOF token, writing to output asm file");
+            info_msg("Encountered space token, no code generation needed");
             break;
-
+        case token_type_e::type_EOF:
+            info_msg("Encountered EOF token, finishing code generation");
+            break;
         default:
             error_msg("Encountered unknown token type in codegen");
     }

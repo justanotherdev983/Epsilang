@@ -58,6 +58,8 @@ std::vector<token_t> tokenise(const std::string &contents) {
                 curr_token.type = token_type_e::type_let;
             else if (word ==  "if") {
                 curr_token.type = token_type_e::type_if;
+            } else if (word == "while") {
+                curr_token.type = token_type_e::type_while;
             }
             else if (word == "else") {
                 curr_token.type = token_type_e::type_else;
@@ -106,7 +108,7 @@ std::vector<token_t> tokenise(const std::string &contents) {
                 consume(contents, token_index); // Consume first '='
                 consume(contents, token_index); // Consume second '='
             } else {
-                curr_token.type = token_type_e::type_equal;
+                curr_token.type = token_type_e::type_assignment;
                 curr_token.value = std::string(1, consume(contents, token_index));
             }
         }

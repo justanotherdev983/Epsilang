@@ -8,7 +8,31 @@
 #include "core/codegen.hpp"
 #include "utils/error.hpp"
 
+/*
+fn add(a, b) {
+    return a + b;
+}
 
+fn max(a, b) {
+    if (a >= b) {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+let result = add(5, 10);
+let bigger = max(result, 20);
+
+let counter = 0;
+let sum = 0;
+while (counter < 5) {
+    sum = add(sum, counter);
+    counter = counter + 1;
+}
+
+let final_result = max(bigger, sum);
+exit(final_result);*/
 
 std::string program_contents;
 
@@ -33,7 +57,7 @@ int main(int argc, char **argv)
 
   std::ifstream input_file(argv[1]);
   if (!input_file) {
-    error_msg("Could not open file: ", argv[1]);
+    error_msg("Could not open file: {}", argv[1]);
     return 1;
   }
 
@@ -42,7 +66,7 @@ int main(int argc, char **argv)
     program_contents += line_buf + '\n';
   }
 
-  info_msg("File contents: ", program_contents);
+  info_msg("File contents: {}", program_contents);
 
 
 
@@ -57,7 +81,7 @@ int main(int argc, char **argv)
   system("ld -o ../output/output ../output/output.o");
 
   info_msg("Outputted binary is found in output/output.asm");
-  info_msg("Error count: {}", get_error_count());
+  info_msg("Error count: {}", std::to_string(get_error_count()));
   reset_error_count();
 
 

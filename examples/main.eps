@@ -1,15 +1,39 @@
-fn add(a, b) {
-    return a + b;
+fn multiply(a, b) {
+    return a * b;
 }
 
-fn max(a, b) {
-    if (a >= b) {
+fn min(a, b) {
+    if (a <= b) {
         return a;
     } else {
         return b;
     }
 }
 
-let result = add(5, 10);
-let bigger = max(result, 20);
-exit(bigger);
+fn process(value) {
+    let result = value;
+    let i = 0;
+
+    while (i < 3) {
+        if (result > 10) {
+            result = result - 5;
+        } else {
+            result = result + 2;
+        }
+        i = i + 1;
+    }
+
+    return result;
+}
+
+let x = 5;
+let y = 8;
+let product = multiply(x, y);
+let smaller = min(product, 30);
+let processed = process(smaller);
+
+if (processed > 15) {
+    exit(0);
+} else {
+    exit(1);
+}
