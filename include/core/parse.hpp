@@ -38,4 +38,8 @@ void parse_if_statement(std::vector<token_t>& token_stream, size_t &token_index,
 void parse_return_statement(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node);
 void parse_function_statement(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node);
 
+void parse_assignment_statement(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node);
+void parse_while_statement(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node);
+void parse_block(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node);
+
 std::vector<ast_node_t> parse_statement(std::vector<token_t>& token_stream);

@@ -12,6 +12,14 @@ const token_t* peek_token(const std::vector<token_t>& tokens, const size_t &inde
     return nullptr;
 }
 
+const token_t* peek_token_ahead(const std::vector<token_t>& tokens, const size_t &index, size_t ahead) {
+    if (index < tokens.size()) {
+        size_t new_index = index + ahead;
+        return &tokens[new_index];
+    }
+    return nullptr;
+}
+
 // Consume the current token and move to the next one
 const token_t* consume_token(const std::vector<token_t>& tokens, size_t &index) {
     if (index < tokens.size()) {
@@ -37,12 +45,13 @@ std::string token_type_to_string(token_type_e type) {
     case token_type_e::type_exit: return "type_exit";
     case token_type_e::type_let: return "type_let";
     case token_type_e::type_identifier: return "type_identifier";
-    case token_type_e::type_equal: return "type_equal";
+    case token_type_e::type_assignment: return "type_assignment";
     case token_type_e::type_int_lit: return "type_int_lit";
     case token_type_e::type_semi: return "type_semi";
     case token_type_e::type_space: return "type_space";
     case token_type_e::type_EOF: return "type_EOF";
     case token_type_e::type_if: return "type_if";
+    case token_type_e::type_while: return "type_while";
     case token_type_e::type_else: return "type_else";
     case token_type_e::type_eq: return "type_eq";
     case token_type_e::type_nq: return "type_nq";
@@ -90,15 +99,49 @@ void parse_block(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& 
         else if (token->type == token_type_e::type_if) {
             parse_if_statement(tokens, token_index, statement);
         }
+        else if (token->type == token_type_e::type_while) {
+            parse_while_statement(tokens, token_index, statement);
+        }
         else if (token->type == token_type_e::type_exit) {
             parse_exit_statement(tokens, token_index, statement);
         }
         else if (token->type == token_type_e::type_return) {
             parse_return_statement(tokens, token_index, statement);
         }
+        else if (token->type == token_type_e::type_identifier) {
+            // Check if this is an assignment (identifier followed by =)
+            const token_t* next_token = peek_token_ahead(tokens, token_index, 1);
+            
+            if (next_token && next_token->type == token_type_e::type_assignment) {
+                // This is an assignment statement
+                parse_assignment_statement(tokens, token_index, statement);
+            }
+            else {
+                // This is an expression starting with an identifier
+                parse_expression(tokens, token_index, statement);
+            }
+            
+            // Look for semicolon
+            token = peek_token(tokens, token_index);
+            if (token && token->type == token_type_e::type_semi) {
+                consume_token(tokens, token_index);
+            } else {
+                error_msg("Expected ';' after statement, but found: {}", 
+                        token ? token_type_to_string(token->type) : "EOF");
+                // Try to recover by skipping to next semicolon or closing brace
+                while (token && token->type != token_type_e::type_semi &&
+                      token->type != token_type_e::type_close_squigly) {
+                    consume_token(tokens, token_index);
+                    token = peek_token(tokens, token_index);
+                }
+                if (token && token->type == token_type_e::type_semi) {
+                    consume_token(tokens, token_index);
+                }
+                continue;
+            }
+        }
         else if (token->type == token_type_e::type_int_lit ||
-                 token->type == token_type_e::type_identifier ||
-                 token->type == token_type_e::type_open_paren) {
+                token->type == token_type_e::type_open_paren) {
             parse_expression(tokens, token_index, statement);
            
             // Look for semicolon
@@ -106,11 +149,11 @@ void parse_block(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& 
             if (token && token->type == token_type_e::type_semi) {
                 consume_token(tokens, token_index);
             } else {
-                error_msg("Expected ';' after expression in block, but found: {}",
-                         token ? token_type_to_string(token->type) : "EOF");
+                error_msg("Expected ';' after expression in block, but found: {}", 
+                        token ? token_type_to_string(token->type) : "EOF");
                 // Try to recover by skipping to next semicolon or closing brace
                 while (token && token->type != token_type_e::type_semi &&
-                       token->type != token_type_e::type_close_squigly) {
+                      token->type != token_type_e::type_close_squigly) {
                     consume_token(tokens, token_index);
                     token = peek_token(tokens, token_index);
                 }
@@ -124,7 +167,7 @@ void parse_block(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& 
             error_msg("Unexpected token in block: {}", token_type_to_string(token->type));
             // Skip to next statement
             while (token && token->type != token_type_e::type_semi &&
-                   token->type != token_type_e::type_close_squigly) {
+                  token->type != token_type_e::type_close_squigly) {
                 consume_token(tokens, token_index);
                 token = peek_token(tokens, token_index);
             }
@@ -138,6 +181,7 @@ void parse_block(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& 
     }
    
     // Store the statements in the root node
+    root_node.type = token_type_e::type_block;
     root_node.statements = std::move(block_statements);
 }
 
@@ -297,6 +341,93 @@ void parse_expression(std::vector<token_t>& tokens, size_t& token_index, ast_nod
     }
 }
 
+void parse_while_statement(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node) {
+    consume_token(tokens, token_index); // Consume 'while' token
+    
+    // Check for opening parenthesis
+    const token_t* open_paren = peek_token(tokens, token_index);
+    if (!open_paren || open_paren->type != token_type_e::type_open_paren) {
+        error_msg("Expected '(' after while statement, but found: {}",
+                open_paren ? token_type_to_string(open_paren->type) : "EOF");
+        return;
+    }
+    consume_token(tokens, token_index);
+    
+    // Parse condition
+    ast_node_t condition_node;
+    parse_comparison(tokens, token_index, condition_node);
+    
+    // Check for closing parenthesis
+    const token_t* close_paren = peek_token(tokens, token_index);
+    if (!close_paren || close_paren->type != token_type_e::type_close_paren) {
+        error_msg("Expected ')' after while condition, but found: {}",
+                close_paren ? token_type_to_string(close_paren->type) : "EOF");
+        return;
+    }
+    consume_token(tokens, token_index);
+    
+    // Check for opening brace
+    const token_t* open_squigly = peek_token(tokens, token_index);
+    if (!open_squigly || open_squigly->type != token_type_e::type_open_squigly) {
+        error_msg("Expected '{{' after while condition, but found: {}",
+                open_squigly ? token_type_to_string(open_squigly->type) : "EOF");
+        return;
+    }
+    consume_token(tokens, token_index);
+    
+    // Parse body
+    ast_node_t body_node;
+    body_node.type = token_type_e::type_block;  
+    parse_block(tokens, token_index, body_node);
+    
+    // REMOVE THIS SECTION - DON'T CHECK FOR CLOSING BRACE
+    // parse_block() already consumed it
+    /*
+    const token_t* close_squigly = peek_token(tokens, token_index);
+    if (!close_squigly || close_squigly->type != token_type_e::type_close_squigly) {
+        error_msg("Expected '}}' at the end of while block, but found: {}",
+                close_squigly ? token_type_to_string(close_squigly->type) : "EOF");
+        return;
+    }
+    consume_token(tokens, token_index);
+    */
+    
+    // Create the while statement node
+    root_node.type = token_type_e::type_while;
+    root_node.child_node_1 = std::make_unique<ast_node_t>(std::move(condition_node));
+    root_node.child_node_2 = std::make_unique<ast_node_t>(std::move(body_node));
+}
+
+void parse_assignment_statement(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node) {
+    // Parse left-hand side (identifier)
+    const token_t* identifier_token = peek_token(tokens, token_index);
+    if (!identifier_token || identifier_token->type != token_type_e::type_identifier) {
+        error_msg("Expected identifier in assignment, but found: {}", 
+                 identifier_token ? token_type_to_string(identifier_token->type) : "EOF");
+        return;
+    }
+    
+    std::string identifier_value = identifier_token->value;
+    consume_token(tokens, token_index);
+    
+    // Parse '='
+    const token_t* equal_token = peek_token(tokens, token_index);
+    if (!equal_token || equal_token->type != token_type_e::type_assignment) {
+        error_msg("Expected '=' in assignment, but found: {}", 
+                 equal_token ? token_type_to_string(equal_token->type) : "EOF");
+        return;
+    }
+    consume_token(tokens, token_index);
+    
+    // Create the assignment node
+    root_node.type = token_type_e::type_assignment;
+    root_node.string_value = identifier_value;
+    
+    // Parse right-hand side (expression)
+    root_node.child_node_1 = std::make_unique<ast_node_t>();
+    parse_expression(tokens, token_index, *root_node.child_node_1);
+}
+
 void parse_function_statement(std::vector<token_t>& tokens, size_t& token_index, ast_node_t& root_node) {
     consume_token(tokens, token_index); // Consume 'fn' token
     
@@ -428,7 +559,7 @@ void parse_let_statement(std::vector<token_t>& tokens, size_t &token_index, ast_
     consume_token(tokens, token_index); // Consume the identifier token
 
     const token_t* equal_token = peek_token(tokens, token_index);
-    if (!equal_token || equal_token->type != token_type_e::type_equal) {
+    if (!equal_token || equal_token->type != token_type_e::type_assignment) {
         error_msg("Expected '=' in let statement, but found: {}", token_type_to_string(equal_token->type));
         return;
     }
@@ -461,7 +592,9 @@ void parse_comparison(std::vector<token_t>& tokens, size_t& token_index, ast_nod
     if (token->type == token_type_e::type_eq || 
         token->type == token_type_e::type_nq || 
         token->type == token_type_e::type_ge || 
-        token->type == token_type_e::type_le) {
+        token->type == token_type_e::type_le ||
+        token->type == token_type_e::type_lt || 
+        token->type == token_type_e::type_gt) {
         
         ast_node_t operator_node;
         operator_node.type = token->type;
@@ -597,6 +730,10 @@ std::vector<ast_node_t> parse_statement(std::vector<token_t>& token_stream) {
         } else if (token->type == token_type_e::type_if) {
             ast_node_t root_node;
             parse_if_statement(token_stream, token_index, root_node);
+            program_ast.push_back(std::move(root_node));
+        } else if (token->type == token_type_e::type_while) {
+            ast_node_t root_node;
+            parse_while_statement(token_stream, token_index, root_node);
             program_ast.push_back(std::move(root_node));
         } else if (token->type == token_type_e::type_fn) {
             ast_node_t root_node;

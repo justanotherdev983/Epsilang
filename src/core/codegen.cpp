@@ -2,6 +2,7 @@
 #include <map>
 
 #include "core/codegen.hpp"
+#include "core/parse.hpp"
 #include "core/tokenise.hpp"
 #include "utils/error.hpp"
 
@@ -105,6 +106,33 @@ void process_function_declarations(std::vector<ast_node_t> &ast, code_gen_ctx_t&
             ctx.function_table[node.string_value] = &node;
         }
     }
+}
+
+void gen_while_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
+    std::string label_start = ctx.generate_label("while_start");
+    std::string label_body = ctx.generate_label("while_body");
+    std::string label_end = ctx.generate_label("while_end");
+   
+    // Start of the loop
+    ctx.asm_file << label_start << ":" << std::endl;
+   
+    // Generate condition code
+    gen_comparison(*node.child_node_1, ctx, label_body, label_end);
+   
+    // Loop body - DON'T emit the label again, it was already emitted by gen_comparison
+    // ctx.asm_file << label_body << ":" << std::endl;  // REMOVE THIS LINE
+    
+    if (node.child_node_2 && node.child_node_2->type == token_type_e::type_block) {
+        for (const auto& stmt : node.child_node_2->statements) {
+            gen_node_code(stmt, ctx);
+        }
+    }
+   
+    // Jump back to condition
+    ctx.asm_file << "    jmp " << label_start << std::endl;
+   
+    // Exit point of the loop
+    ctx.asm_file << label_end << ":" << std::endl;
 }
 
 void gen_function_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
@@ -304,14 +332,14 @@ void gen_comparison(const ast_node_t& node, code_gen_ctx_t& ctx, const std::stri
     // Generate code for left operand
     gen_node_code(*node.child_node_1, ctx);
     ctx.asm_file << "    push rdi" << std::endl;  // Save left operand
-    
+   
     // Generate code for right operand
     gen_node_code(*node.child_node_2, ctx);
     ctx.asm_file << "    pop rax" << std::endl;   // Restore left operand
-    
+   
     // Compare the values
     ctx.asm_file << "    cmp rax, rdi" << std::endl;
-    
+   
     // Perform the appropriate jump based on the comparison type
     switch (node.type) {
         case token_type_e::type_eq:  // Equal
@@ -326,14 +354,20 @@ void gen_comparison(const ast_node_t& node, code_gen_ctx_t& ctx, const std::stri
         case token_type_e::type_le:  // Less or equal
             ctx.asm_file << "    jle " << label_true << std::endl;
             break;
+        case token_type_e::type_lt:  // Less than
+            ctx.asm_file << "    jl " << label_true << std::endl;
+            break;
+        case token_type_e::type_gt:  // Greater than
+            ctx.asm_file << "    jg " << label_true << std::endl;
+            break;
         default:
             ctx.asm_file << "    ; unknown comparison operator" << std::endl;
             break;
     }
-    
+   
     // Jump to end if condition is false
     ctx.asm_file << "    jmp " << label_end << std::endl;
-    
+   
     // Label for true condition
     ctx.asm_file << label_true << ":" << std::endl;
 }
@@ -396,7 +430,7 @@ void push_var_on_stack(const ast_node_t& node, code_gen_ctx_t& ctx) {
                                     << "' assigned value in rdi" << std::endl;
                     }
                 } else {
-                    error_msg("Variable {}'", identifier, "' not declared");
+                    error_msg("Variable not declared {}", identifier);
                 }
             } else {
                 error_msg("Invalid variable declaration: missing identifier");
@@ -450,11 +484,36 @@ void gen_node_code(const ast_node_t& node, code_gen_ctx_t& ctx) {
             }
             gen_binary_op(node, ctx);
             break;
-            
+        case token_type_e::type_eq:
+        case token_type_e::type_nq:
+        case token_type_e::type_ge:
+        case token_type_e::type_le:
+        case token_type_e::type_lt:
+        case token_type_e::type_gt:
+            // Handle comparison operators
+            {
+                std::string label_true = ctx.generate_label("comp_true");
+                std::string label_end = ctx.generate_label("comp_end");
+                
+                gen_comparison(node, ctx, label_true, label_end);
+                
+                // If we reach here, comparison was false
+                ctx.asm_file << "    mov rdi, 0" << std::endl;
+                ctx.asm_file << "    jmp " << label_end << std::endl;
+                
+                // If comparison was true
+                ctx.asm_file << label_true << ":" << std::endl;
+                ctx.asm_file << "    mov rdi, 1" << std::endl;
+                
+                ctx.asm_file << label_end << ":" << std::endl;
+            }
+            break;
         case token_type_e::type_if:
             gen_if_code(node, ctx);
             break;
-
+        case token_type_e::type_while:
+            gen_while_code(node, ctx);
+            break;
         case token_type_e::type_block:
             gen_block_code(node, ctx);
             break;
