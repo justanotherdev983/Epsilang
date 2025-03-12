@@ -17,28 +17,30 @@ std::string code_gen_ctx_t::generate_label(const std::string& base_name) {
 
 void code_gen_ctx_t::access_variable(const std::string& var_name) {
     if (current_function) {
-      // Check if it's a parameter
-      for (size_t i = 0; i < current_function->parameters.size(); ++i) {
-          if (current_function->parameters[i] == var_name) {
-              int offset = -((i + 1) * 8);
-              asm_file << "    mov rdi, [rbp" << offset << "]" << std::endl;
-              return;
-          }
-      }
+        // Check if it's a parameter
+        for (size_t i = 0; i < current_function->parameters.size(); ++i) {
+            if (current_function->parameters[i] == var_name) {
+                int offset = -((i + 1) * 8);
+                asm_file << "    mov rdi, [rbp" << offset << "]" << std::endl;
+                asm_file << "    ; Accessing parameter '" << var_name << "'" << std::endl;
+                return;
+            }
+        }
 
-      // Check if it's a local variable
-      auto it = current_function->local_symbols.find(var_name);
-      if (it != current_function->local_symbols.end()) {
-          int offset = -(current_function->parameters.size() + std::stoi(it->second) + 1) * 8;
-          asm_file << "    mov rdi, [rbp" << offset << "]" << std::endl;
-          return;
-      }
+        // Check if it's a local variable
+        auto it = current_function->local_symbols.find(var_name);
+        if (it != current_function->local_symbols.end()) {
+            int offset = -(current_function->parameters.size() + std::stoi(it->second) + 1) * 8;
+            asm_file << "    mov rdi, [rbp" << offset << "]" << std::endl;
+            asm_file << "    ; Accessing local variable '" << var_name << "'" << std::endl;
+            return;
+        }
     }
-
     
-    // If not local or parameter, assume global
+    // If not local or parameter, check global
     if (symbol_table.count(var_name) > 0) {
         asm_file << "    mov rdi, [" << symbol_table[var_name] << "]" << std::endl;
+        asm_file << "    ; Accessing global variable '" << var_name << "'" << std::endl;
     } else {
         error_msg("Undefined variable: {}", var_name);
     }
@@ -242,12 +244,74 @@ void gen_function_call(const ast_node_t& node, code_gen_ctx_t& ctx) {
 
 // Process a single node recursively for variable declarations
 void process_node_declarations(ast_node_t& node, code_gen_ctx_t& ctx) {
-    if (node.type == token_type_e::type_let && node.child_node_1 &&
-            node.child_node_1->type == token_type_e::type_identifier) {
+    if (node.type == token_type_e::type_fn) {
+        // Process function declaration
+        // Note: We don't add function parameters to the global symbol table
+        
+        // Process the function body for local variables
+        if (node.body.size() > 0) {
+            // Save current function context
+            ast_node_t* previous_function = ctx.current_function;
+            ctx.current_function = &node;
+            
+            int local_var_index = 0;
+            
+            // Process each statement in the function body
+            for (auto& stmt : node.body) {
+                // Check for local variable declarations specifically
+                if (stmt.type == token_type_e::type_let && 
+                    stmt.child_node_1 && 
+                    stmt.child_node_1->type == token_type_e::type_identifier) {
+                    
+                    std::string var_name = stmt.child_node_1->string_value;
+                    
+                    // Add to the function's local symbol table with an index
+                    node.local_symbols[var_name] = std::to_string(local_var_index++);
+                    info_msg("Added local variable '{}' at index {} to function '{}'", 
+                             var_name, local_var_index-1, node.string_value);
+                }
+                
+                // Continue processing other nodes in the statement
+                process_node_declarations(stmt, ctx);
+            }
+            
+            // Restore previous function context
+            ctx.current_function = previous_function;
+        }
+    }
+    else if (node.type == token_type_e::type_let && 
+             node.child_node_1 && 
+             node.child_node_1->type == token_type_e::type_identifier) {
+        
         std::string identifier = node.child_node_1->string_value;
-        std::string var_name = "var_" + identifier;
-        ctx.symbol_table[identifier] = var_name;
-    } else if (node.type == token_type_e::type_if) {
+        
+        // Check if we're inside a function
+        if (ctx.current_function) {
+            // Skip if it's already a parameter or local variable
+            bool is_parameter = false;
+            for (const auto& param : ctx.current_function->parameters) {
+                if (param == identifier) {
+                    is_parameter = true;
+                    break;
+                }
+            }
+            
+            if (!is_parameter && ctx.current_function->local_symbols.find(identifier) == ctx.current_function->local_symbols.end()) {
+                // Add to the function's local symbol table with an index
+                int local_var_index = ctx.current_function->local_symbols.size();
+                ctx.current_function->local_symbols[identifier] = std::to_string(local_var_index);
+                info_msg("Added local variable '{}' at index {} to function '{}'", 
+                         identifier, local_var_index, ctx.current_function->string_value);
+            }
+        } 
+        else {
+            // Global variable
+            std::string var_name = "var_" + identifier;
+            ctx.symbol_table[identifier] = var_name;
+            info_msg("Added global variable '{}'", identifier);
+        }
+    } 
+    else if (node.type == token_type_e::type_if) {
         // Process the condition
         if (node.child_node_1) {
             process_node_declarations(*node.child_node_1, ctx);
@@ -270,7 +334,8 @@ void process_node_declarations(ast_node_t& node, code_gen_ctx_t& ctx) {
                 process_node_declarations(*node.child_node_3, ctx);
             }
         }
-    } else if (node.type == token_type_e::type_block) {
+    } 
+    else if (node.type == token_type_e::type_block) {
         // Process all statements in a block
         for (auto& stmt : node.statements) {
             process_node_declarations(stmt, ctx);
@@ -416,21 +481,49 @@ void push_var_on_stack(const ast_node_t& node, code_gen_ctx_t& ctx) {
                 node.child_node_1->type == token_type_e::type_identifier) {
                 std::string identifier = node.child_node_1->string_value;
 
-                // Check if the identifier exists in the symbol table
-                if (ctx.symbol_table.count(identifier) > 0) {
-                    std::string var_name = ctx.symbol_table[identifier];
-
-                    // Generate code for the expression (will put result in rdi)
-                    if (node.child_node_2) {
-                        gen_node_code(*node.child_node_2, ctx);
-
-                        // Store the result in the named location
-                        ctx.asm_file << "    mov [" << var_name << "], rdi" << std::endl;
-                        ctx.asm_file << "    ; Variable '" << identifier
-                                    << "' assigned value in rdi" << std::endl;
+                // Generate code for the expression (will put result in rdi)
+                if (node.child_node_2) {
+                    gen_node_code(*node.child_node_2, ctx);
+                    
+                    // Check if we're inside a function context
+                    if (ctx.current_function) {
+                        // Check if it's a parameter
+                        bool is_parameter = false;
+                        for (size_t i = 0; i < ctx.current_function->parameters.size(); ++i) {
+                            if (ctx.current_function->parameters[i] == identifier) {
+                                int offset = -((i + 1) * 8);
+                                ctx.asm_file << "    mov [rbp" << offset << "], rdi" << std::endl;
+                                ctx.asm_file << "    ; Parameter '" << identifier 
+                                           << "' assigned value in rdi" << std::endl;
+                                is_parameter = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!is_parameter) {
+                            // Check if it's a local variable
+                            auto it = ctx.current_function->local_symbols.find(identifier);
+                            if (it != ctx.current_function->local_symbols.end()) {
+                                int offset = -(ctx.current_function->parameters.size() + 
+                                             std::stoi(it->second) + 1) * 8;
+                                ctx.asm_file << "    mov [rbp" << offset << "], rdi" << std::endl;
+                                ctx.asm_file << "    ; Local variable '" << identifier 
+                                           << "' assigned value in rdi" << std::endl;
+                            } else {
+                                error_msg("Variable not found in local scope: {}", identifier);
+                            }
+                        }
+                    } else {
+                        // Handle global variables
+                        if (ctx.symbol_table.count(identifier) > 0) {
+                            std::string var_name = ctx.symbol_table[identifier];
+                            ctx.asm_file << "    mov [" << var_name << "], rdi" << std::endl;
+                            ctx.asm_file << "    ; Global variable '" << identifier
+                                       << "' assigned value in rdi" << std::endl;
+                        } else {
+                            error_msg("Global variable not declared: {}", identifier);
+                        }
                     }
-                } else {
-                    error_msg("Variable not declared {}", identifier);
                 }
             } else {
                 error_msg("Invalid variable declaration: missing identifier");
